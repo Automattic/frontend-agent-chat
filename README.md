@@ -1,21 +1,20 @@
-# Data Machine Frontend Chat
+# Frontend Agent Chat
 
-Floating agent chat widget for WordPress. Connects to [Data Machine](https://github.com/Extra-Chill/data-machine)'s agent system to provide a configurable AI assistant on any site.
+Floating agent chat widget for WordPress. Connects to the canonical `agents/chat` ability from [Agents API](https://github.com/Automattic/agents-api) and keeps compatibility with Data Machine when Data Machine registers itself as the chat runtime.
 
 ## How it works
 
 A small React app mounts a floating action button (FAB) in the bottom-right corner of every page. Click it and a slide-in drawer opens with a full chat interface powered by the [`@extrachill/chat`](https://www.npmjs.com/package/@extrachill/chat) package.
 
-The chat connects to a Data Machine agent — which agent, who can see it, and what it says are all configurable per site. This plugin is a pure frontend shell with no business logic or tools. Tools are registered by other plugins via the `datamachine_tools` filter and Data Machine picks them up automatically.
+The chat connects to a registered WordPress agent. The widget stays a frontend shell: agent runtime, tools, prompt policy, and model execution belong to whichever plugin handles the canonical `agents/chat` ability. Data Machine remains compatible by registering itself as that handler.
 
 ## Configuration
 
-Each site configures the chat widget via the `data_machine_frontend_chat_config` option:
+Each site configures the chat widget via the `frontend_agent_chat_config` option. Existing installs can keep using `data_machine_frontend_chat_config`.
 
 ```php
-update_option( 'data_machine_frontend_chat_config', [
+update_option( 'frontend_agent_chat_config', [
     'agent_slug'  => 'my-agent',
-    'visibility'  => 'team',
     'description' => 'Your AI assistant.',
     'enabled'     => true,
 ] );
@@ -23,37 +22,35 @@ update_option( 'data_machine_frontend_chat_config', [
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `agent_slug` | `string` | Slug of the Data Machine agent to connect to |
-| `visibility` | `string` | Who sees the chat: `team`, `logged_in`, or `public` |
+| `agent_slug` | `string` | Slug of the registered WordPress agent to connect to |
 | `description` | `string` | Shown in the empty state before the first message |
 | `enabled` | `bool` | Toggle the chat on/off for this site |
 
-The config can also be overridden entirely via the `data_machine_frontend_chat_config` filter.
+The config can also be overridden entirely via the `frontend_agent_chat_config` filter. The legacy `data_machine_frontend_chat_config` filter still runs afterward for compatibility.
 
-Team visibility is controlled by the `data_machine_frontend_chat_is_team_member` filter (defaults to `manage_options`).
+Visibility defaults to `manage_options`, with Data Machine's access helper used when available. Override with `frontend_agent_chat_user_can_see`.
 
 ## Requirements
 
 - WordPress 6.9+
-- [Data Machine](https://github.com/Extra-Chill/data-machine) plugin (provides the agent backend)
-- A configured Data Machine agent
+- [Agents API](https://github.com/Automattic/agents-api) or another plugin that provides the `agents/chat` ability
+- A registered WordPress agent
 
 ## Architecture
 
 ```
 Browser                          Server
 -------                          ------
-FAB -> Drawer -> <Chat>    -->   /datamachine/v1/chat
-       (React)                   ChatOrchestrator
-       @extrachill/chat          -> Agent memory
-                                 -> Tool calling
-                                 -> Multi-turn conversation
+FAB -> Drawer -> <Chat>    -->   /frontend-agent-chat/v1/chat
+       (React)                   REST adapter
+       @extrachill/chat          -> agents/chat ability
+                                 -> runtime handler
 ```
 
 - **Frontend**: `@extrachill/chat` package, mounted via `wp_footer` hook
-- **Backend**: Data Machine chat REST API with agent resolution by slug
+- **Backend**: Local REST adapter that dispatches to the canonical `agents/chat` ability
 - **Auth**: WordPress nonce authentication via `wp-api-fetch`
-- **Agent resolution**: Looked up by slug from the network-scoped `datamachine_agents` table — no hardcoded IDs
+- **Agent resolution**: Looked up by registered agent slug, with a Data Machine row fallback for existing installs
 
 ## Features
 

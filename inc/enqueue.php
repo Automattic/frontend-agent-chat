@@ -2,7 +2,7 @@
 /**
  * Script and style enqueue + mount container.
  *
- * @package DataMachineFrontendChat
+ * @package FrontendAgentChat
  * @since 0.4.0
  */
 
@@ -19,24 +19,24 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @return void
  */
-function data_machine_frontend_chat_enqueue() {
-	$config = data_machine_frontend_chat_get_config();
+function frontend_agent_chat_enqueue() {
+	$config = frontend_agent_chat_get_config();
 
 	if ( empty( $config['enabled'] ) || empty( $config['agent_slug'] ) ) {
 		return;
 	}
 
-	$agent = data_machine_frontend_chat_resolve_agent( $config['agent_slug'] );
+	$agent = frontend_agent_chat_resolve_agent( $config['agent_slug'] );
 	if ( ! $agent ) {
 		return;
 	}
 
-	if ( ! data_machine_frontend_chat_user_can_see( $agent ) ) {
+	if ( ! frontend_agent_chat_user_can_see( $agent ) ) {
 		return;
 	}
 
-	$build_dir = DATA_MACHINE_FRONTEND_CHAT_PLUGIN_DIR . 'build/';
-	$build_url = DATA_MACHINE_FRONTEND_CHAT_PLUGIN_URL . 'build/';
+	$build_dir = FRONTEND_AGENT_CHAT_PLUGIN_DIR . 'build/';
+	$build_url = FRONTEND_AGENT_CHAT_PLUGIN_URL . 'build/';
 	$asset_php = $build_dir . 'index.asset.php';
 
 	if ( ! file_exists( $asset_php ) ) {
@@ -46,27 +46,27 @@ function data_machine_frontend_chat_enqueue() {
 	$asset = require $asset_php;
 
 	wp_enqueue_script(
-		'data-machine-frontend-chat',
+		'frontend-agent-chat',
 		$build_url . 'index.js',
 		$asset['dependencies'] ?? array(),
-		$asset['version'] ?? DATA_MACHINE_FRONTEND_CHAT_VERSION,
+		$asset['version'] ?? FRONTEND_AGENT_CHAT_VERSION,
 		array( 'in_footer' => true )
 	);
 
 	if ( file_exists( $build_dir . 'index.css' ) ) {
 		wp_enqueue_style(
-			'data-machine-frontend-chat',
+			'frontend-agent-chat',
 			$build_url . 'index.css',
 			array(),
-			$asset['version'] ?? DATA_MACHINE_FRONTEND_CHAT_VERSION
+			$asset['version'] ?? FRONTEND_AGENT_CHAT_VERSION
 		);
 	}
 
 	$js_config = array(
-		'agentId'          => (int) $agent['agent_id'],
-		'basePath'         => '/datamachine/v1/chat',
-		'agentName'        => (string) $agent['agent_name'],
-		'agentDescription' => (string) $config['description'],
+		'agentSlug'        => (string) ( $agent['agent_slug'] ?? $config['agent_slug'] ),
+		'basePath'         => '/frontend-agent-chat/v1/chat',
+		'agentName'        => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $config['agent_slug'] ),
+		'agentDescription' => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
 	);
 
 	if ( ! empty( $config['loading_messages'] ) ) {
@@ -74,12 +74,12 @@ function data_machine_frontend_chat_enqueue() {
 	}
 
 	wp_localize_script(
-		'data-machine-frontend-chat',
-		'datamachineChatConfig',
+		'frontend-agent-chat',
+		'frontendAgentChatConfig',
 		$js_config
 	);
 }
-add_action( 'wp_enqueue_scripts', 'data_machine_frontend_chat_enqueue' );
+add_action( 'wp_enqueue_scripts', 'frontend_agent_chat_enqueue' );
 
 /**
  * Render the chat mount container in wp_footer.
@@ -88,11 +88,29 @@ add_action( 'wp_enqueue_scripts', 'data_machine_frontend_chat_enqueue' );
  *
  * @return void
  */
-function data_machine_frontend_chat_render_container() {
-	if ( ! wp_script_is( 'data-machine-frontend-chat', 'enqueued' ) ) {
+function frontend_agent_chat_render_container() {
+	if ( ! wp_script_is( 'frontend-agent-chat', 'enqueued' ) ) {
 		return;
 	}
 
-	echo '<div data-datamachine-chat></div>';
+	echo '<div data-frontend-agent-chat></div>';
 }
-add_action( 'wp_footer', 'data_machine_frontend_chat_render_container', 50 );
+add_action( 'wp_footer', 'frontend_agent_chat_render_container', 50 );
+
+/**
+ * Backward-compatible enqueue wrapper.
+ *
+ * @return void
+ */
+function data_machine_frontend_chat_enqueue() {
+	frontend_agent_chat_enqueue();
+}
+
+/**
+ * Backward-compatible container wrapper.
+ *
+ * @return void
+ */
+function data_machine_frontend_chat_render_container() {
+	frontend_agent_chat_render_container();
+}

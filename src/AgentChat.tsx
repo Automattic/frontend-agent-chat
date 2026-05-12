@@ -8,14 +8,15 @@
  * When AI uses a pending-action tool (edit_post_blocks, replace_post_blocks,
  * insert_content) with preview mode, the tool result is rendered as a
  * DiffCard with Accept/Reject buttons instead of raw JSON. Accept/Reject
- * hit Data Machine's unified /actions/resolve endpoint.
+ * hit the runtime's pending-action resolution endpoint when available.
  *
- * @package DataMachineFrontendChat
+ * @package
  * @since 0.3.0
  */
-import { createElement, useState, useCallback, useMemo, useEffect } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
-import apiFetch from '@wordpress/api-fetch';
+
+/**
+ * External dependencies
+ */
 import {
 	Chat,
 	DiffCard,
@@ -25,8 +26,15 @@ import {
 import type { ToolGroup, DiffData, FetchFn, MediaUploadFn } from '@extrachill/chat';
 import type { ReactNode } from 'react';
 
+/**
+ * WordPress dependencies
+ */
+import { createElement, useState, useCallback, useMemo, useEffect } from '@wordpress/element';
+import { __, sprintf } from '@wordpress/i18n';
+import apiFetch from '@wordpress/api-fetch';
+
 interface AgentChatProps {
-	agentId: number;
+	agentSlug: string;
 	basePath: string;
 	agentName: string;
 	agentDescription: string;
@@ -42,6 +50,9 @@ interface AgentChatProps {
  *
  * Returns null if the tool result is not a preview action (e.g. the
  * tool was called without preview=true, or the result is malformed).
+ *
+ * @param group Tool group.
+ * @return Diff data when present.
  */
 function parseDiffFromToolResult( group: ToolGroup ): DiffData | null {
 	return parseCanonicalDiffFromToolGroup( group );
@@ -58,6 +69,9 @@ function parseDiffFromToolResult( group: ToolGroup ): DiffData | null {
  * this callback works uniformly for edit_post_blocks, replace_post_blocks,
  * insert_content, and any future kind a plugin registers on the
  * `datamachine_pending_action_handlers` filter.
+ *
+ * @param actionId Pending action ID.
+ * @param decision Resolution decision.
  */
 function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejected' ): void {
 	apiFetch( {
@@ -70,19 +84,25 @@ function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejecte
 	} );
 }
 
-const agentFetch: FetchFn = ( options ) =>
-	apiFetch( {
+function createAgentFetch( agentSlug: string ): FetchFn {
+	return ( options ) => apiFetch( {
 		path: options.path,
 		method: options.method,
-		data: options.data,
+		data: options.method === 'POST'
+			? { ...( options.data ?? {} ), agent: agentSlug }
+			: options.data,
 		headers: options.headers,
 	} );
+}
 
 /**
  * Upload a file to the WordPress Media Library.
  *
  * Uses the standard wp/v2/media endpoint via @wordpress/api-fetch,
  * which handles nonce auth automatically.
+ *
+ * @param file File to upload.
+ * @return Uploaded media descriptor.
  */
 const wpMediaUpload: MediaUploadFn = async ( file: File ) => {
 	const formData = new FormData();
@@ -114,7 +134,7 @@ function renderDiffCard( group: ToolGroup ): ReactNode {
 }
 
 export default function AgentChat( {
-	agentId,
+	agentSlug,
 	basePath,
 	agentName,
 	agentDescription,
@@ -123,6 +143,7 @@ export default function AgentChat( {
 	const [ isOpen, setIsOpen ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const metadata = useClientContextMetadata();
+	const agentFetch = useMemo( () => createAgentFetch( agentSlug ), [ agentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => setIsOpen( false ), [] );
 
@@ -155,7 +176,11 @@ export default function AgentChat( {
 				type: 'button',
 				className: `datamachine-chat__fab${ isOpen ? ' is-hidden' : '' }`,
 				onClick: open,
-				'aria-label': __( `Open ${ agentName } chat`, 'data-machine-frontend-chat' ),
+				'aria-label': sprintf(
+					/* translators: %s: agent name. */
+					__( 'Open %s chat', 'frontend-agent-chat' ),
+					agentName
+				),
 			},
 			agentName,
 			unreadCount > 0 &&
@@ -185,7 +210,7 @@ export default function AgentChat( {
 						type: 'button',
 						className: 'datamachine-chat__close',
 						onClick: close,
-						'aria-label': __( 'Close', 'data-machine-frontend-chat' ),
+						'aria-label': __( 'Close', 'frontend-agent-chat' ),
 					},
 					'\u00D7'
 				)
@@ -196,11 +221,14 @@ export default function AgentChat( {
 				createElement( Chat, {
 					basePath,
 					fetchFn: agentFetch,
-					agentId,
 					showTools: true,
 					showSessions: true,
 					toolRenderers,
-					placeholder: __( `Ask ${ agentName } anything…`, 'data-machine-frontend-chat' ),
+					placeholder: sprintf(
+						/* translators: %s: agent name. */
+						__( 'Ask %s anything…', 'frontend-agent-chat' ),
+						agentName
+					),
 					metadata,
 					isVisible: isOpen,
 					onUnreadChange: setUnreadCount,
@@ -210,10 +238,14 @@ export default function AgentChat( {
 						createElement( 'h3', null, agentName ),
 						createElement( 'p', null, agentDescription )
 					),
-				loadingMessages,
-				mediaUploadFn: wpMediaUpload,
-				processingLabel: ( turnCount: number ) =>
-					__( `Working… (turn ${ turnCount })`, 'data-machine-frontend-chat' ),
+					loadingMessages,
+					mediaUploadFn: wpMediaUpload,
+					processingLabel: ( turnCount: number ) =>
+						sprintf(
+							/* translators: %d: processing turn count. */
+							__( 'Working… (turn %d)', 'frontend-agent-chat' ),
+							turnCount
+						),
 				} )
 			)
 		)

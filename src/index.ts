@@ -1,23 +1,34 @@
 /**
- * Data Machine Frontend Chat — Entry point.
+ * Frontend Agent Chat — Entry point.
  *
  * Standalone script enqueued on frontend pages for eligible users.
- * Mounts a configurable Data Machine agent chat widget.
+ * Mounts a configurable WordPress agent chat widget.
  *
- * @package DataMachineFrontendChat
+ * @package
  * @since 0.4.0
  */
+
+/**
+ * External dependencies
+ */
 import '@extrachill/chat/css';
-import './agent-chat.css';
-import { createElement } from '@wordpress/element';
-import { createRoot, render } from '@wordpress/element';
 import type { ReactElement } from 'react';
+
+/**
+ * WordPress dependencies
+ */
+import { createElement, createRoot, render } from '@wordpress/element';
+
+/**
+ * Internal dependencies
+ */
+import './agent-chat.css';
 import AgentChat from './AgentChat';
 
 declare global {
 	interface Window {
-		datamachineChatConfig?: {
-			agentId: number;
+		frontendAgentChatConfig?: {
+			agentSlug: string;
 			basePath: string;
 			agentName: string;
 			agentDescription: string;
@@ -30,7 +41,7 @@ declare global {
 	}
 }
 
-const MOUNT_SELECTOR = '[data-datamachine-chat]';
+const MOUNT_SELECTOR = '[data-frontend-agent-chat]';
 
 function mount( container: HTMLElement, component: ReactElement ): void {
 	if ( typeof createRoot === 'function' ) {
@@ -48,8 +59,8 @@ function init(): void {
 		return;
 	}
 
-	const config = window.datamachineChatConfig;
-	if ( ! config?.agentId ) {
+	const config = window.frontendAgentChatConfig;
+	if ( ! config?.agentSlug ) {
 		return;
 	}
 
@@ -57,7 +68,7 @@ function init(): void {
 	mount(
 		el,
 		createElement( AgentChat, {
-			agentId: config.agentId,
+			agentSlug: config.agentSlug,
 			basePath: config.basePath,
 			agentName: config.agentName,
 			agentDescription: config.agentDescription,
