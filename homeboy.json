@@ -1,18 +1,18 @@
 {
-  "id": "data-machine-frontend-chat",
+  "id": "frontend-agent-chat",
   "changelog_target": "docs/CHANGELOG.md",
-  "remote_path": "wp-content/plugins/data-machine-frontend-chat",
+  "remote_path": "wp-content/plugins/frontend-agent-chat",
   "extensions": {
     "wordpress": {}
   },
   "version_targets": [
     {
-      "file": "data-machine-frontend-chat.php",
+      "file": "frontend-agent-chat.php",
       "pattern": "Version:\\s*([\\d.]+)"
     },
     {
-      "file": "data-machine-frontend-chat.php",
-      "pattern": "DATA_MACHINE_FRONTEND_CHAT_VERSION',\\s*'([\\d.]+)"
+      "file": "frontend-agent-chat.php",
+      "pattern": "FRONTEND_AGENT_CHAT_VERSION',\\s*'([\\d.]+)"
     }
   ]
 }

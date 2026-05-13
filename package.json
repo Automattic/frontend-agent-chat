@@ -1,7 +1,7 @@
 {
-	"name": "data-machine-frontend-chat",
+	"name": "frontend-agent-chat",
 	"version": "0.1.0",
-	"description": "Floating agent chat for the Extra Chill network.",
+	"description": "Floating frontend chat widget for WordPress agents.",
 	"private": true,
 	"scripts": {
 		"build": "wp-scripts build",

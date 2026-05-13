@@ -1,63 +1,32 @@
 /**
- * Data Machine Frontend Chat — Floating agent chat styles.
+ * Frontend Agent Chat — Floating agent chat styles.
  *
- * Standalone stylesheet for the floating chat widget.
- * Uses --datamachine-* tokens from Data Machine core where available,
- * with widget-specific properties for FAB/drawer chrome.
- *
- * Shared tokens (from DM core root.css):
- *   --datamachine-text-primary, --datamachine-text-muted,
- *   --datamachine-border-1, --datamachine-bg-light,
- *   --datamachine-blue, --datamachine-color-error,
- *   --datamachine-spacing-md, --datamachine-spacing-lg,
- *   --datamachine-border-radius
- *
- * Widget-specific tokens (set on :root or parent):
- *   --datamachine-fab-bg               (default: #1a1a2e)
- *   --datamachine-fab-color            (default: #fff)
- *   --datamachine-fab-border-color     (default: transparent)
- *   --datamachine-fab-font-family      (default: system)
- *   --datamachine-fab-font-size        (default: 15px)
- *   --datamachine-fab-badge-bg         (default: --datamachine-color-error)
- *   --datamachine-fab-offset           (default: 24px)
- *   --datamachine-drawer-bg            (default: --datamachine-bg-light)
- *   --datamachine-drawer-width         (default: 420px)
- *   --datamachine-header-font-family   (default: system)
- *   --datamachine-header-font-size     (default: 18px)
- *   --datamachine-font-family          (default: system)
- *
- * @package DataMachineFrontendChat
- * @since 0.4.0
- * @since 0.7.0 Namespaced all custom properties to --datamachine-*.
- * @since 0.8.0 Aligned with Data Machine core design tokens.
+ * @package FrontendAgentChat
  */
 
-/* Root container — viewport-level, non-interactive wrapper. */
-.datamachine-chat {
+.frontend-agent-chat {
 	position: fixed;
 	z-index: 9999;
 	inset: 0;
 	pointer-events: none;
 }
 
-/* ── FAB ─────────────────────────────────────────────── */
-
-.datamachine-chat__fab {
+.frontend-agent-chat__fab {
 	position: fixed;
 	z-index: 9999;
-	bottom: calc(var(--datamachine-fab-offset, 24px) + env(safe-area-inset-bottom, 0px));
-	right: var(--datamachine-fab-offset, 24px);
+	bottom: calc(var(--frontend-agent-chat-fab-offset, 24px) + env(safe-area-inset-bottom, 0px));
+	right: var(--frontend-agent-chat-fab-offset, 24px);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	height: 56px;
 	padding: 0 24px;
-	border: 1px solid var(--datamachine-fab-border-color, transparent);
+	border: 1px solid var(--frontend-agent-chat-fab-border-color, transparent);
 	border-radius: 28px;
-	background: var(--datamachine-fab-bg, #1a1a2e);
-	color: var(--datamachine-fab-color, #fff);
-	font-family: var(--datamachine-fab-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
-	font-size: var(--datamachine-fab-font-size, 15px);
+	background: var(--frontend-agent-chat-fab-bg, #1a1a2e);
+	color: var(--frontend-agent-chat-fab-color, #fff);
+	font-family: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+	font-size: var(--frontend-agent-chat-fab-font-size, 15px);
 	font-weight: 700;
 	cursor: pointer;
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
@@ -67,26 +36,23 @@
 	visibility: visible;
 }
 
-.datamachine-chat__fab:hover {
+.frontend-agent-chat__fab:hover {
 	transform: translateY(-2px) scale(1.02);
 	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-.datamachine-chat__fab:active {
+.frontend-agent-chat__fab:active {
 	transform: translateY(0) scale(0.98);
 }
 
-/* Hide FAB when drawer is open (CSS-based, keeps it in DOM). */
-.datamachine-chat__fab.is-hidden {
+.frontend-agent-chat__fab.is-hidden {
 	opacity: 0;
 	visibility: hidden;
 	transform: scale(0.8);
 	pointer-events: none;
 }
 
-/* ── FAB Unread Badge ────────────────────────────────── */
-
-.datamachine-chat__fab-badge {
+.frontend-agent-chat__fab-badge {
 	position: absolute;
 	top: -4px;
 	right: -4px;
@@ -94,7 +60,7 @@
 	height: 20px;
 	padding: 0 6px;
 	border-radius: 10px;
-	background: var(--datamachine-fab-badge-bg, var(--datamachine-color-error, #ef4444));
+	background: var(--frontend-agent-chat-fab-badge-bg, #ef4444);
 	color: #fff;
 	font-size: 11px;
 	font-weight: 700;
@@ -105,79 +71,62 @@
 	pointer-events: none;
 }
 
-/* ── Admin bar offset ────────────────────────────────── */
-/* WordPress sets --wp-admin--admin-bar--height: 32px on
-   html.wp-toolbar when the admin bar is showing. We use
-   it to push the drawer below the bar.
-   Below 783px WordPress makes the admin bar position:absolute
-   (it scrolls away), so the drawer should ignore it. */
-
-.admin-bar .datamachine-chat__drawer {
+.admin-bar .frontend-agent-chat__drawer {
 	top: var(--wp-admin--admin-bar--height, 32px);
 }
 
 @media (max-width: 782px) {
-	.admin-bar .datamachine-chat__drawer {
+	.admin-bar .frontend-agent-chat__drawer {
 		top: 0;
 	}
 }
 
-/* ── Drawer ──────────────────────────────────────────── */
-
-.datamachine-chat__drawer {
+.frontend-agent-chat__drawer {
 	position: fixed;
 	z-index: 9999;
 	top: 0;
 	right: 0;
 	bottom: 0;
 	width: 100%;
-	max-width: var(--datamachine-drawer-width, 420px);
+	max-width: var(--frontend-agent-chat-drawer-width, 420px);
 	display: flex;
 	flex-direction: column;
-	background: var(--datamachine-drawer-bg, var(--datamachine-bg-light, #f1f5f9));
-	border-left: 1px solid var(--datamachine-border-1, #e2e8f0);
+	background: var(--frontend-agent-chat-drawer-bg, #f1f5f9);
+	border-left: 1px solid var(--frontend-agent-chat-border-color, #e2e8f0);
 	box-shadow: -4px 0 24px rgba(0, 0, 0, 0.2);
 	pointer-events: auto;
-
-	/* Slide animation */
 	transform: translateX(100%);
 	transition: transform 0.25s ease;
 }
 
-.datamachine-chat__drawer.is-open {
+.frontend-agent-chat__drawer.is-open {
 	transform: translateX(0);
-}
-
-/* When closed, prevent tab focus inside the drawer. */
-.datamachine-chat__drawer:not(.is-open) {
-	visibility: hidden;
-	transition: transform 0.25s ease, visibility 0s 0.25s;
-}
-
-.datamachine-chat__drawer.is-open {
 	visibility: visible;
 	transition: transform 0.25s ease, visibility 0s 0s;
 }
 
-/* ── Header ──────────────────────────────────────────── */
+.frontend-agent-chat__drawer:not(.is-open) {
+	visibility: hidden;
+	transition: transform 0.25s ease, visibility 0s 0.25s;
+}
 
-.datamachine-chat__header {
+.frontend-agent-chat__header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: var(--datamachine-spacing-xs, 8px) var(--datamachine-spacing-md, 16px);
-	border-bottom: 1px solid var(--datamachine-border-1, #e2e8f0);
+	padding: var(--frontend-agent-chat-spacing-xs, 8px) var(--frontend-agent-chat-spacing-md, 16px);
+	border-bottom: 1px solid var(--frontend-agent-chat-border-color, #e2e8f0);
 	flex-shrink: 0;
 }
 
-.datamachine-chat__title {
-	font-family: var(--datamachine-header-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
-	font-size: var(--datamachine-header-font-size, 18px);
+.frontend-agent-chat__title {
+	font-family: var(--frontend-agent-chat-header-font-family, var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif));
+	font-size: var(--frontend-agent-chat-header-font-size, 18px);
 	font-weight: 700;
-	color: var(--datamachine-text-primary, #1e293b);
+	color: var(--frontend-agent-chat-text-primary, #1e293b);
 }
 
-.datamachine-chat__close {
+.frontend-agent-chat__close {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -186,71 +135,64 @@
 	border: none;
 	border-radius: 50%;
 	background: transparent;
-	color: var(--datamachine-text-primary, #1e293b);
+	color: var(--frontend-agent-chat-text-primary, #1e293b);
 	font-size: 18px;
 	cursor: pointer;
 	transition: background 0.15s;
 }
 
-.datamachine-chat__close:hover {
-	background: var(--datamachine-bg-light, #f8fafc);
+.frontend-agent-chat__close:hover {
+	background: var(--frontend-agent-chat-bg-muted, #f8fafc);
 }
 
-/* ── Body (Chat) ─────────────────────────────────────── */
-
-.datamachine-chat__body {
+.frontend-agent-chat__body {
 	flex: 1;
 	min-height: 0;
 	overflow: hidden;
 }
 
-/* Map --datamachine-* tokens to @extrachill/chat --ec-chat-* variables. */
-.datamachine-chat__body .ec-chat {
-	--ec-chat-bg: var(--datamachine-drawer-bg, var(--datamachine-bg-light, #f1f5f9));
-	--ec-chat-text: var(--datamachine-text-primary, #1e293b);
-	--ec-chat-text-muted: var(--datamachine-text-muted, #94a3b8);
-	--ec-chat-border: var(--datamachine-border-1, #e2e8f0);
-	--ec-chat-user-bg: var(--datamachine-blue, #2563eb);
+.frontend-agent-chat__body .ec-chat {
+	--ec-chat-bg: var(--frontend-agent-chat-drawer-bg, #f1f5f9);
+	--ec-chat-text: var(--frontend-agent-chat-text-primary, #1e293b);
+	--ec-chat-text-muted: var(--frontend-agent-chat-text-muted, #94a3b8);
+	--ec-chat-border: var(--frontend-agent-chat-border-color, #e2e8f0);
+	--ec-chat-user-bg: var(--frontend-agent-chat-accent, #2563eb);
 	--ec-chat-user-text: #fff;
-	--ec-chat-assistant-bg: var(--datamachine-bg-lighter, #f8fafc);
-	--ec-chat-assistant-text: var(--datamachine-text-primary, #1e293b);
-	--ec-chat-input-bg: var(--datamachine-bg-lighter, #f8fafc);
-	--ec-chat-input-border: var(--datamachine-border-1, #e2e8f0);
-	--ec-chat-input-focus-border: var(--datamachine-blue, #2563eb);
-	--ec-chat-send-bg: var(--datamachine-blue, #2563eb);
+	--ec-chat-assistant-bg: var(--frontend-agent-chat-bg-muted, #f8fafc);
+	--ec-chat-assistant-text: var(--frontend-agent-chat-text-primary, #1e293b);
+	--ec-chat-input-bg: var(--frontend-agent-chat-bg-muted, #f8fafc);
+	--ec-chat-input-border: var(--frontend-agent-chat-border-color, #e2e8f0);
+	--ec-chat-input-focus-border: var(--frontend-agent-chat-accent, #2563eb);
+	--ec-chat-send-bg: var(--frontend-agent-chat-accent, #2563eb);
 	--ec-chat-send-text: #fff;
-	--ec-chat-tool-bg: var(--datamachine-bg-lighter, #f8fafc);
-	--ec-chat-tool-border: var(--datamachine-border-1, #e2e8f0);
-	--ec-chat-session-hover-bg: var(--datamachine-border-1, #e2e8f0);
-	--ec-chat-font-family: var(--datamachine-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+	--ec-chat-tool-bg: var(--frontend-agent-chat-bg-muted, #f8fafc);
+	--ec-chat-tool-border: var(--frontend-agent-chat-border-color, #e2e8f0);
+	--ec-chat-session-hover-bg: var(--frontend-agent-chat-border-color, #e2e8f0);
+	--ec-chat-font-family: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
 	--ec-chat-border-radius: 0;
 
 	height: 100%;
 	border-radius: 0;
 }
 
-/* ── Empty state ─────────────────────────────────────── */
-
-.datamachine-chat__empty {
+.frontend-agent-chat__empty {
 	text-align: center;
-	padding: var(--datamachine-spacing-lg, 24px);
+	padding: var(--frontend-agent-chat-spacing-lg, 24px);
 }
 
-.datamachine-chat__empty h3 {
+.frontend-agent-chat__empty h3 {
 	margin: 0 0 4px;
-	font-family: var(--datamachine-header-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
-	color: var(--datamachine-text-primary, #1e293b);
+	font-family: var(--frontend-agent-chat-header-font-family, var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif));
+	color: var(--frontend-agent-chat-text-primary, #1e293b);
 }
 
-.datamachine-chat__empty p {
+.frontend-agent-chat__empty p {
 	margin: 0;
-	color: var(--datamachine-text-muted, #94a3b8);
+	color: var(--frontend-agent-chat-text-muted, #94a3b8);
 }
-
-/* ── Mobile ──────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-	.datamachine-chat__drawer {
+	.frontend-agent-chat__drawer {
 		max-width: 100%;
 	}
 }

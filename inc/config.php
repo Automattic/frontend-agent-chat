@@ -1,22 +1,8 @@
 <?php
 /**
- * Configuration — per-site and network-wide agent settings.
+ * Configuration for the frontend agent chat widget.
  *
- * Each site configures which Data Machine agent powers its floating chat.
- * On multisite, a network-wide option serves as the default for all sites.
- * Per-site options override the network default (including opting out).
- *
- * Visibility is determined by Data Machine's agent access system:
- * PermissionHelper::can_access_agent(). No custom permission logic here.
- *
- * Resolution order:
- *   1. Per-site option  (get_option)
- *   2. Network option   (get_site_option, multisite only)
- *   3. Filter           (data_machine_frontend_chat_config)
- *   4. Hardcoded defaults
- *
- * @package DataMachineFrontendChat
- * @since 0.4.0
+ * @package FrontendAgentChat
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -26,96 +12,160 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Get the frontend chat configuration for the current site.
  *
- * On multisite, falls back to the network-wide option when the current
- * site has no per-site config. This lets you configure the agent once
- * and have it apply across all sites in the network.
- *
- * @since 0.4.0
- * @since 0.6.0 Added network option fallback for multisite.
- *
- * @return array{
- *   agent_slug: string,
- *   description: string,
- *   enabled: bool,
- *   loading_messages: array{mode?: string, messages?: string[], interval?: int}|bool,
- * }
+ * @return array
  */
-function data_machine_frontend_chat_get_config(): array {
+function frontend_agent_chat_get_config(): array {
 	$defaults = array(
 		'agent_slug'       => '',
-		'description'      => __( 'Your AI assistant.', 'data-machine-frontend-chat' ),
+		'description'      => __( 'Your AI assistant.', 'frontend-agent-chat' ),
 		'enabled'          => false,
 		'loading_messages' => true,
 	);
 
-	$saved = get_option( 'data_machine_frontend_chat_config', array() );
-
-	// On multisite, fall back to the network option when no per-site config exists.
+	$saved = get_option( 'frontend_agent_chat_config', array() );
 	if ( empty( $saved ) && is_multisite() ) {
-		$saved = get_site_option( 'data_machine_frontend_chat_config', array() );
+		$saved = get_site_option( 'frontend_agent_chat_config', array() );
 	}
 
-	$config = wp_parse_args( $saved, $defaults );
+	$config = wp_parse_args( is_array( $saved ) ? $saved : array(), $defaults );
 
 	/**
 	 * Filter the frontend chat config for the current site.
 	 *
-	 * @since 0.4.0
-	 *
 	 * @param array $config Current configuration.
 	 */
-	return apply_filters( 'data_machine_frontend_chat_config', $config );
+	return apply_filters( 'frontend_agent_chat_config', $config );
 }
 
 /**
  * Check whether the current user can see the chat widget.
  *
- * Defers entirely to Data Machine's agent access system. If DM's
- * PermissionHelper is available, uses can_access_agent(). Otherwise
- * falls back to manage_options capability.
- *
- * @param array $agent Resolved agent row from data_machine_frontend_chat_resolve_agent.
+ * @param array|null $agent Resolved agent descriptor.
  * @return bool
  */
-function data_machine_frontend_chat_user_can_see( array $agent ): bool {
+function frontend_agent_chat_user_can_see( ?array $agent ): bool {
 	if ( ! is_user_logged_in() ) {
 		return false;
 	}
 
-	$agent_id = (int) ( $agent['agent_id'] ?? 0 );
-	if ( $agent_id <= 0 ) {
+	$agent_slug = frontend_agent_chat_get_agent_access_slug( $agent );
+	if ( '' === $agent_slug ) {
 		return false;
 	}
 
-	if ( class_exists( '\DataMachine\Abilities\PermissionHelper' ) ) {
-		return \DataMachine\Abilities\PermissionHelper::can_access_agent( $agent_id, 'viewer' );
-	}
+	$minimum_role = class_exists( 'WP_Agent_Access_Grant' ) ? WP_Agent_Access_Grant::ROLE_VIEWER : 'viewer';
+	$allowed      = frontend_agent_chat_can_access_agent( $agent_slug, $minimum_role );
 
-	// Fallback when Data Machine's PermissionHelper is not available.
-	return current_user_can( 'manage_options' );
+	/**
+	 * Filter the frontend chat visibility decision.
+	 *
+	 * @param bool       $allowed Access decision from Agents API.
+	 * @param array|null $agent   Resolved agent descriptor.
+	 */
+	return (bool) apply_filters( 'frontend_agent_chat_user_can_see', $allowed, $agent );
 }
 
 /**
- * Resolve the agent from the Data Machine agents table by slug.
+ * Check agent access through Agents API.
  *
- * @param string $slug Agent slug to resolve.
- * @return array|null Agent row or null.
+ * @param string $agent_slug   Registered agent slug/id.
+ * @param string $minimum_role Minimum access role.
+ * @return bool
  */
-function data_machine_frontend_chat_resolve_agent( string $slug ): ?array {
-	static $cache = array();
+function frontend_agent_chat_can_access_agent( string $agent_slug, string $minimum_role ): bool {
+	$result = frontend_agent_chat_execute_ability(
+		'agents/can-access-agent',
+		array(
+			'agent'        => $agent_slug,
+			'minimum_role' => $minimum_role,
+		)
+	);
 
-	if ( isset( $cache[ $slug ] ) ) {
-		return $cache[ $slug ];
+	return ! is_wp_error( $result ) && is_array( $result ) && ! empty( $result['allowed'] );
+}
+
+/**
+ * Resolve the registered agent slug/id used by Agents API access checks.
+ *
+ * @param array|null $agent Resolved agent descriptor.
+ * @return string
+ */
+function frontend_agent_chat_get_agent_access_slug( ?array $agent ): string {
+	if ( ! is_array( $agent ) ) {
+		return '';
 	}
 
-	if ( ! class_exists( '\DataMachine\Core\Database\Agents\Agents' ) ) {
-		$cache[ $slug ] = null;
+	return sanitize_title( (string) ( $agent['agent_slug'] ?? $agent['slug'] ?? '' ) );
+}
+
+/**
+ * Resolve an accessible registered agent by slug.
+ *
+ * @param string $slug Agent slug to resolve.
+ * @return array|null Agent descriptor or null.
+ */
+function frontend_agent_chat_resolve_agent( string $slug ): ?array {
+	$slug = sanitize_title( $slug );
+	if ( '' === $slug ) {
 		return null;
 	}
 
-	$repo  = new \DataMachine\Core\Database\Agents\Agents();
-	$agent = $repo->get_by_slug( $slug );
+	$minimum_role = class_exists( 'WP_Agent_Access_Grant' ) ? WP_Agent_Access_Grant::ROLE_VIEWER : 'viewer';
+	$result       = frontend_agent_chat_execute_ability( 'agents/list-accessible-agents', array( 'minimum_role' => $minimum_role ) );
+	$agents       = is_array( $result ) && is_array( $result['agents'] ?? null ) ? $result['agents'] : array();
 
-	$cache[ $slug ] = $agent;
-	return $agent;
+	foreach ( $agents as $agent ) {
+		if ( ! is_array( $agent ) || sanitize_title( (string) ( $agent['slug'] ?? '' ) ) !== $slug ) {
+			continue;
+		}
+
+		return array(
+			'agent_slug'        => (string) ( $agent['slug'] ?? '' ),
+			'agent_name'        => (string) ( $agent['label'] ?? $agent['slug'] ?? '' ),
+			'agent_description' => (string) ( $agent['description'] ?? '' ),
+			'meta'              => is_array( $agent['meta'] ?? null ) ? $agent['meta'] : array(),
+		);
+	}
+
+	return null;
+}
+
+/**
+ * Get a required WordPress ability.
+ *
+ * @param string $name Ability name.
+ * @return WP_Ability|WP_Error Ability object or error.
+ */
+function frontend_agent_chat_get_required_ability( string $name ) {
+	$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( $name ) : null;
+	if ( $ability ) {
+		return $ability;
+	}
+
+	return new WP_Error(
+		'frontend_agent_chat_missing_ability',
+		sprintf(
+			/* translators: %s: ability name. */
+			__( 'The %s ability is not available.', 'frontend-agent-chat' ),
+			$name
+		),
+		array( 'status' => 501 )
+	);
+}
+
+/**
+ * Execute a required Agents API ability.
+ *
+ * @param string $name  Ability name.
+ * @param array  $input Ability input.
+ * @return mixed|WP_Error
+ */
+function frontend_agent_chat_execute_ability( string $name, array $input ) {
+	$ability = frontend_agent_chat_get_required_ability( $name );
+	if ( is_wp_error( $ability ) ) {
+		return $ability;
+	}
+
+	$result = $ability->execute( $input );
+	return is_wp_error( $result ) ? $result : $result;
 }

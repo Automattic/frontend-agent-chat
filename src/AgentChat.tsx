@@ -8,14 +8,15 @@
  * When AI uses a pending-action tool (edit_post_blocks, replace_post_blocks,
  * insert_content) with preview mode, the tool result is rendered as a
  * DiffCard with Accept/Reject buttons instead of raw JSON. Accept/Reject
- * hit Data Machine's unified /actions/resolve endpoint.
+ * hit the frontend adapter's Agents API pending-action resolution endpoint.
  *
- * @package DataMachineFrontendChat
+ * @package
  * @since 0.3.0
  */
-import { createElement, useState, useCallback, useMemo, useEffect } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
-import apiFetch from '@wordpress/api-fetch';
+
+/**
+ * External dependencies
+ */
 import {
 	Chat,
 	DiffCard,
@@ -25,8 +26,15 @@ import {
 import type { ToolGroup, DiffData, FetchFn, MediaUploadFn } from '@extrachill/chat';
 import type { ReactNode } from 'react';
 
+/**
+ * WordPress dependencies
+ */
+import { createElement, useState, useCallback, useMemo, useEffect } from '@wordpress/element';
+import { __, sprintf } from '@wordpress/i18n';
+import apiFetch from '@wordpress/api-fetch';
+
 interface AgentChatProps {
-	agentId: number;
+	agentSlug: string;
 	basePath: string;
 	agentName: string;
 	agentDescription: string;
@@ -42,6 +50,9 @@ interface AgentChatProps {
  *
  * Returns null if the tool result is not a preview action (e.g. the
  * tool was called without preview=true, or the result is malformed).
+ *
+ * @param group Tool group.
+ * @return Diff data when present.
  */
 function parseDiffFromToolResult( group: ToolGroup ): DiffData | null {
 	return parseCanonicalDiffFromToolGroup( group );
@@ -50,18 +61,16 @@ function parseDiffFromToolResult( group: ToolGroup ): DiffData | null {
 /**
  * Resolve a pending action by id.
  *
- * Data Machine unified its preview primitive on a generic pending-action
- * model in PR #1171 (editor #5): the old /datamachine/v1/diff/resolve
- * endpoint and `diff_id` parameter were removed in favour of
- * /datamachine/v1/actions/resolve with `action_id`. The unified endpoint
- * handles every preview-capable tool kind, not just content diffs, so
- * this callback works uniformly for edit_post_blocks, replace_post_blocks,
- * insert_content, and any future kind a plugin registers on the
- * `datamachine_pending_action_handlers` filter.
+ * The server route dispatches to the canonical `agents/resolve-pending-action`
+ * ability so tool preview resolution stays independent from the concrete
+ * runtime/store implementation.
+ *
+ * @param actionId Pending action ID.
+ * @param decision Resolution decision.
  */
 function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejected' ): void {
 	apiFetch( {
-		path: '/datamachine/v1/actions/resolve',
+		path: '/frontend-agent-chat/v1/chat/actions/resolve',
 		method: 'POST',
 		data: { action_id: actionId, decision },
 	} ).catch( ( err: unknown ) => {
@@ -70,19 +79,25 @@ function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejecte
 	} );
 }
 
-const agentFetch: FetchFn = ( options ) =>
-	apiFetch( {
+function createAgentFetch( agentSlug: string ): FetchFn {
+	return ( options ) => apiFetch( {
 		path: options.path,
 		method: options.method,
-		data: options.data,
+		data: options.method === 'POST'
+			? { ...( options.data ?? {} ), agent: agentSlug }
+			: options.data,
 		headers: options.headers,
 	} );
+}
 
 /**
  * Upload a file to the WordPress Media Library.
  *
  * Uses the standard wp/v2/media endpoint via @wordpress/api-fetch,
  * which handles nonce auth automatically.
+ *
+ * @param file File to upload.
+ * @return Uploaded media descriptor.
  */
 const wpMediaUpload: MediaUploadFn = async ( file: File ) => {
 	const formData = new FormData();
@@ -114,7 +129,7 @@ function renderDiffCard( group: ToolGroup ): ReactNode {
 }
 
 export default function AgentChat( {
-	agentId,
+	agentSlug,
 	basePath,
 	agentName,
 	agentDescription,
@@ -123,6 +138,7 @@ export default function AgentChat( {
 	const [ isOpen, setIsOpen ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const metadata = useClientContextMetadata();
+	const agentFetch = useMemo( () => createAgentFetch( agentSlug ), [ agentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => setIsOpen( false ), [] );
 
@@ -148,72 +164,83 @@ export default function AgentChat( {
 
 	return createElement(
 		'div',
-		{ className: 'datamachine-chat' },
+		{ className: 'frontend-agent-chat' },
 		createElement(
 			'button',
 			{
 				type: 'button',
-				className: `datamachine-chat__fab${ isOpen ? ' is-hidden' : '' }`,
+				className: `frontend-agent-chat__fab${ isOpen ? ' is-hidden' : '' }`,
 				onClick: open,
-				'aria-label': __( `Open ${ agentName } chat`, 'data-machine-frontend-chat' ),
+				'aria-label': sprintf(
+					/* translators: %s: agent name. */
+					__( 'Open %s chat', 'frontend-agent-chat' ),
+					agentName
+				),
 			},
 			agentName,
 			unreadCount > 0 &&
 				createElement(
 					'span',
-					{ className: 'datamachine-chat__fab-badge' },
+					{ className: 'frontend-agent-chat__fab-badge' },
 					unreadCount > 99 ? '99+' : unreadCount
 				)
 		),
 		createElement(
 			'div',
 			{
-				className: `datamachine-chat__drawer${ isOpen ? ' is-open' : '' }`,
+				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }`,
 				'aria-hidden': ! isOpen,
 			},
 			createElement(
 				'div',
-				{ className: 'datamachine-chat__header' },
+				{ className: 'frontend-agent-chat__header' },
 				createElement(
 					'span',
-					{ className: 'datamachine-chat__title' },
+					{ className: 'frontend-agent-chat__title' },
 					agentName
 				),
 				createElement(
 					'button',
 					{
 						type: 'button',
-						className: 'datamachine-chat__close',
+						className: 'frontend-agent-chat__close',
 						onClick: close,
-						'aria-label': __( 'Close', 'data-machine-frontend-chat' ),
+						'aria-label': __( 'Close', 'frontend-agent-chat' ),
 					},
 					'\u00D7'
 				)
 			),
 			createElement(
 				'div',
-				{ className: 'datamachine-chat__body' },
+				{ className: 'frontend-agent-chat__body' },
 				createElement( Chat, {
 					basePath,
 					fetchFn: agentFetch,
-					agentId,
 					showTools: true,
 					showSessions: true,
 					toolRenderers,
-					placeholder: __( `Ask ${ agentName } anything…`, 'data-machine-frontend-chat' ),
+					placeholder: sprintf(
+						/* translators: %s: agent name. */
+						__( 'Ask %s anything…', 'frontend-agent-chat' ),
+						agentName
+					),
 					metadata,
 					isVisible: isOpen,
 					onUnreadChange: setUnreadCount,
 					emptyState: createElement(
 						'div',
-						{ className: 'datamachine-chat__empty' },
+						{ className: 'frontend-agent-chat__empty' },
 						createElement( 'h3', null, agentName ),
 						createElement( 'p', null, agentDescription )
 					),
-				loadingMessages,
-				mediaUploadFn: wpMediaUpload,
-				processingLabel: ( turnCount: number ) =>
-					__( `Working… (turn ${ turnCount })`, 'data-machine-frontend-chat' ),
+					loadingMessages,
+					mediaUploadFn: wpMediaUpload,
+					processingLabel: ( turnCount: number ) =>
+						sprintf(
+							/* translators: %d: processing turn count. */
+							__( 'Working… (turn %d)', 'frontend-agent-chat' ),
+							turnCount
+						),
 				} )
 			)
 		)
