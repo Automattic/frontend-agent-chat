@@ -37,6 +37,16 @@ function frontend_agent_chat_register_rest_routes(): void {
 
 	register_rest_route(
 		'frontend-agent-chat/v1',
+		'/chat/actions/resolve',
+		array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => 'frontend_agent_chat_rest_resolve_pending_action',
+			'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
 		'/chat/sessions',
 		array(
 			'methods'             => WP_REST_Server::READABLE,
@@ -105,37 +115,43 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 		return new WP_Error( 'frontend_agent_chat_empty_message', __( 'Message cannot be empty.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( 'agents/chat' ) : null;
-	if ( ! $ability ) {
-		return new WP_Error( 'frontend_agent_chat_agents_api_missing', __( 'The agents/chat ability is not available.', 'frontend-agent-chat' ), array( 'status' => 501 ) );
-	}
-
 	$config      = frontend_agent_chat_get_config();
 	$agent_param = $request->get_param( 'agent' );
 	$agent_slug  = sanitize_title( (string) ( '' !== (string) $agent_param ? $agent_param : $config['agent_slug'] ) );
-	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	$session_id  = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
 
 	if ( '' === $session_id ) {
-		$session_id = frontend_agent_chat_generate_session_id();
+		$created = frontend_agent_chat_execute_ability(
+			'agents/create-conversation-session',
+			array(
+				'agent'   => $agent_slug,
+				'context' => 'frontend-agent-chat',
+			)
+		);
+		if ( is_wp_error( $created ) ) {
+			return $created;
+		}
+		$session_id = frontend_agent_chat_extract_session_id( is_array( $created['session'] ?? null ) ? $created['session'] : array() );
+	}
+
+	if ( '' === $session_id ) {
+		return new WP_Error( 'frontend_agent_chat_session_create_failed', __( 'The conversation session ability did not return a session ID.', 'frontend-agent-chat' ), array( 'status' => 500 ) );
 	}
 
 	$attachments = $request->get_param( 'attachments' );
-	if ( ! is_array( $attachments ) ) {
-		$attachments = array();
-	}
-
-	$result = $ability->execute(
+	$result      = frontend_agent_chat_execute_ability(
+		'agents/chat',
 		array(
 			'agent'          => $agent_slug,
 			'message'        => $message,
 			'session_id'     => $session_id,
-			'attachments'    => $attachments,
+			'attachments'    => is_array( $attachments ) ? $attachments : array(),
 			'client_context' => array(
 				'source'       => 'rest',
 				'client_name'  => 'frontend-agent-chat',
 				'connector_id' => 'frontend-agent-chat',
 			),
-		),
+		)
 	);
 
 	if ( is_wp_error( $result ) ) {
@@ -143,12 +159,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 	}
 
 	$result_session_id = sanitize_text_field( (string) ( $result['session_id'] ?? $session_id ) );
-	if ( '' === $result_session_id ) {
-		$result_session_id = $session_id;
-	}
-
-	$conversation = frontend_agent_chat_normalize_result_messages( $result, $message );
-	frontend_agent_chat_store_session( $result_session_id, $agent_slug, $conversation );
+	$conversation      = frontend_agent_chat_normalize_result_messages( $result, $message );
 
 	return rest_ensure_response(
 		array(
@@ -156,7 +167,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 			'data'    => array(
 				'session_id'        => $result_session_id,
 				'response'          => (string) ( $result['reply'] ?? '' ),
-				'tool_calls'        => array(),
+				'tool_calls'        => is_array( $result['tool_calls'] ?? null ) ? $result['tool_calls'] : array(),
 				'conversation'      => $conversation,
 				'metadata'          => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
 				'completed'         => (bool) ( $result['completed'] ?? true ),
@@ -164,15 +175,12 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 				'turn_number'       => 1,
 				'max_turns_reached' => false,
 			),
-		),
+		)
 	);
 }
 
 /**
  * Continue a pending response.
- *
- * Agents API's canonical ability is single-turn today, so the adapter reports
- * no additional messages and lets runtimes return `completed=true` on send.
  *
  * @param WP_REST_Request $request REST request.
  * @return WP_REST_Response
@@ -191,85 +199,128 @@ function frontend_agent_chat_rest_continue_message( WP_REST_Request $request ): 
 				'max_turns'         => 1,
 				'max_turns_reached' => false,
 			),
-		),
+		)
 	);
 }
 
 /**
- * List stored chat sessions for the current user.
+ * Resolve a pending action through Agents API.
  *
  * @param WP_REST_Request $request REST request.
- * @return WP_REST_Response
+ * @return WP_REST_Response|WP_Error
  */
-function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ): WP_REST_Response {
-	$limit_param = $request->get_param( 'limit' );
-	$limit       = max( 1, min( 100, (int) ( null !== $limit_param ? $limit_param : 20 ) ) );
-	$sessions    = frontend_agent_chat_get_sessions();
-	usort(
-		$sessions,
-		static fn( array $a, array $b ): int => strcmp( (string) ( $b['updated_at'] ?? '' ), (string) ( $a['updated_at'] ?? '' ) )
+function frontend_agent_chat_rest_resolve_pending_action( WP_REST_Request $request ) {
+	$action_id = sanitize_text_field( (string) $request->get_param( 'action_id' ) );
+	$decision  = sanitize_text_field( (string) $request->get_param( 'decision' ) );
+	if ( '' === $action_id || '' === $decision ) {
+		return new WP_Error( 'frontend_agent_chat_invalid_pending_action', __( 'action_id and decision are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$result = frontend_agent_chat_execute_ability(
+		'agents/resolve-pending-action',
+		array(
+			'action_id' => $action_id,
+			'decision'  => $decision,
+			'resolver'  => frontend_agent_chat_current_resolver_id(),
+		)
 	);
 
-	$items = array_slice( array_map( 'frontend_agent_chat_session_summary', $sessions ), 0, $limit );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
 
 	return rest_ensure_response(
 		array(
 			'success' => true,
-			'data'    => array(
-				'sessions' => $items,
-				'total'    => count( $sessions ),
-				'limit'    => $limit,
-				'offset'   => 0,
-			),
-		),
+			'data'    => $result,
+		)
 	);
 }
 
 /**
- * Get one stored session.
+ * List chat sessions through Agents API.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ) {
+	$config      = frontend_agent_chat_get_config();
+	$limit_param = $request->get_param( 'limit' );
+	$limit       = max( 1, min( 100, (int) ( null !== $limit_param ? $limit_param : 20 ) ) );
+	$result      = frontend_agent_chat_execute_ability(
+		'agents/list-conversation-sessions',
+		array(
+			'limit'   => $limit,
+			'agent'   => sanitize_title( (string) $config['agent_slug'] ),
+			'context' => 'frontend-agent-chat',
+		)
+	);
+
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$sessions = is_array( $result['sessions'] ?? null ) ? $result['sessions'] : array();
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => array(
+				'sessions' => array_map( 'frontend_agent_chat_session_summary', $sessions ),
+				'total'    => count( $sessions ),
+				'limit'    => $limit,
+				'offset'   => 0,
+			),
+		)
+	);
+}
+
+/**
+ * Get one stored session through Agents API.
  *
  * @param WP_REST_Request $request REST request.
  * @return WP_REST_Response|WP_Error
  */
 function frontend_agent_chat_rest_get_session( WP_REST_Request $request ) {
 	$session_id = sanitize_text_field( (string) $request['session_id'] );
-	$session    = frontend_agent_chat_get_sessions()[ $session_id ] ?? null;
-	if ( ! $session ) {
-		return new WP_Error( 'frontend_agent_chat_session_not_found', __( 'Session not found.', 'frontend-agent-chat' ), array( 'status' => 404 ) );
+	$result     = frontend_agent_chat_execute_ability( 'agents/get-conversation-session', array( 'session_id' => $session_id ) );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$session = is_array( $result['session'] ?? null ) ? $result['session'] : array();
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => array(
+				'session_id'   => frontend_agent_chat_extract_session_id( $session ),
+				'conversation' => frontend_agent_chat_session_messages( $session ),
+				'metadata'     => is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array(),
+			),
+		)
+	);
+}
+
+/**
+ * Delete one stored session through Agents API.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_delete_session( WP_REST_Request $request ) {
+	$session_id = sanitize_text_field( (string) $request['session_id'] );
+	$result     = frontend_agent_chat_execute_ability( 'agents/delete-conversation-session', array( 'session_id' => $session_id ) );
+	if ( is_wp_error( $result ) ) {
+		return $result;
 	}
 
 	return rest_ensure_response(
 		array(
 			'success' => true,
 			'data'    => array(
-				'session_id'   => $session_id,
-				'conversation' => is_array( $session['messages'] ?? null ) ? $session['messages'] : array(),
-				'metadata'     => array( 'message_count' => count( $session['messages'] ?? array() ) ),
-			),
-		),
-	);
-}
-
-/**
- * Delete one stored session.
- *
- * @param WP_REST_Request $request REST request.
- * @return WP_REST_Response
- */
-function frontend_agent_chat_rest_delete_session( WP_REST_Request $request ): WP_REST_Response {
-	$session_id = sanitize_text_field( (string) $request['session_id'] );
-	$sessions   = frontend_agent_chat_get_sessions();
-	unset( $sessions[ $session_id ] );
-	frontend_agent_chat_save_sessions( $sessions );
-
-	return rest_ensure_response(
-		array(
-			'success' => true,
-			'data'    => array(
 				'session_id' => $session_id,
-				'deleted'    => true,
+				'deleted'    => ! empty( $result['deleted'] ),
 			),
-		),
+		)
 	);
 }
 
@@ -280,104 +331,45 @@ function frontend_agent_chat_rest_delete_session( WP_REST_Request $request ): WP
  * @return WP_REST_Response
  */
 function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ): WP_REST_Response {
-	$session_id = sanitize_text_field( (string) $request['session_id'] );
-	$sessions   = frontend_agent_chat_get_sessions();
-	if ( isset( $sessions[ $session_id ] ) ) {
-		$sessions[ $session_id ]['unread_count'] = 0;
-		$sessions[ $session_id ]['last_read_at'] = gmdate( 'c' );
-		frontend_agent_chat_save_sessions( $sessions );
-	}
-
 	return rest_ensure_response(
 		array(
 			'success' => true,
-			'data'    => array(),
+			'data'    => array(
+				'session_id' => sanitize_text_field( (string) $request['session_id'] ),
+			),
 		)
 	);
 }
 
 /**
- * Get current user's stored sessions.
+ * Build a stable resolver identifier for pending actions.
  *
- * @return array<string,array>
+ * @return string
  */
-function frontend_agent_chat_get_sessions(): array {
+function frontend_agent_chat_current_resolver_id(): string {
 	$user_id = get_current_user_id();
-	if ( $user_id <= 0 ) {
-		return array();
-	}
-
-	$sessions = get_user_meta( $user_id, 'frontend_agent_chat_sessions', true );
-	return is_array( $sessions ) ? $sessions : array();
+	return $user_id > 0 ? 'user:' . $user_id : 'frontend-agent-chat';
 }
 
 /**
- * Save current user's stored sessions.
+ * Extract a session ID from a session descriptor.
  *
- * @param array<string,array> $sessions Sessions.
- * @return void
+ * @param array $session Session descriptor.
+ * @return string
  */
-function frontend_agent_chat_save_sessions( array $sessions ): void {
-	$user_id = get_current_user_id();
-	if ( $user_id <= 0 ) {
-		return;
-	}
-
-	update_user_meta( $user_id, 'frontend_agent_chat_sessions', $sessions );
-}
-
-/**
- * Store one session projection.
- *
- * @param string $session_id Session ID.
- * @param string $agent_slug Agent slug.
- * @param array  $messages Messages.
- * @return void
- */
-function frontend_agent_chat_store_session( string $session_id, string $agent_slug, array $messages ): void {
-	$sessions = frontend_agent_chat_get_sessions();
-	$now      = gmdate( 'c' );
-	$existing = $sessions[ $session_id ] ?? array();
-
-	$sessions[ $session_id ] = array(
-		'session_id'   => $session_id,
-		'agent'        => $agent_slug,
-		'title'        => $existing['title'] ?? frontend_agent_chat_title_from_messages( $messages ),
-		'created_at'   => $existing['created_at'] ?? $now,
-		'updated_at'   => $now,
-		'messages'     => $messages,
-		'unread_count' => 0,
-		'last_read_at' => $existing['last_read_at'] ?? null,
-	);
-
-	frontend_agent_chat_save_sessions( $sessions );
+function frontend_agent_chat_extract_session_id( array $session ): string {
+	return sanitize_text_field( (string) ( $session['session_id'] ?? $session['id'] ?? '' ) );
 }
 
 /**
  * Normalize canonical agents/chat result messages to @extrachill/chat messages.
  *
- * @param array  $result Runtime result.
+ * @param array  $result       Runtime result.
  * @param string $user_message Original user message.
  * @return array<int,array{role:string,content:string}>
  */
 function frontend_agent_chat_normalize_result_messages( array $result, string $user_message ): array {
-	$messages = array();
-	if ( is_array( $result['messages'] ?? null ) ) {
-		foreach ( $result['messages'] as $message ) {
-			if ( ! is_array( $message ) || ! isset( $message['role'], $message['content'] ) ) {
-				continue;
-			}
-			$role = (string) $message['role'];
-			if ( ! in_array( $role, array( 'user', 'assistant' ), true ) ) {
-				continue;
-			}
-			$messages[] = array(
-				'role'    => $role,
-				'content' => (string) $message['content'],
-			);
-		}
-	}
-
+	$messages = frontend_agent_chat_session_messages( $result );
 	if ( empty( $messages ) ) {
 		$messages[] = array(
 			'role'    => 'user',
@@ -393,32 +385,50 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
 }
 
 /**
+ * Extract chat messages from a session or runtime result.
+ *
+ * @param array $source Session or runtime result.
+ * @return array<int,array{role:string,content:string}>
+ */
+function frontend_agent_chat_session_messages( array $source ): array {
+	$messages = array();
+	foreach ( is_array( $source['messages'] ?? null ) ? $source['messages'] : array() as $message ) {
+		if ( ! is_array( $message ) || ! isset( $message['role'], $message['content'] ) ) {
+			continue;
+		}
+
+		$role = (string) $message['role'];
+		if ( ! in_array( $role, array( 'user', 'assistant' ), true ) ) {
+			continue;
+		}
+
+		$messages[] = array(
+			'role'    => $role,
+			'content' => (string) $message['content'],
+		);
+	}
+
+	return $messages;
+}
+
+/**
  * Build a session summary response.
  *
  * @param array $session Stored session.
  * @return array
  */
 function frontend_agent_chat_session_summary( array $session ): array {
-	$messages = is_array( $session['messages'] ?? null ) ? $session['messages'] : array();
+	$messages = frontend_agent_chat_session_messages( $session );
 	return array(
-		'session_id'    => (string) ( $session['session_id'] ?? '' ),
+		'session_id'    => frontend_agent_chat_extract_session_id( $session ),
 		'title'         => (string) ( $session['title'] ?? frontend_agent_chat_title_from_messages( $messages ) ),
-		'context'       => 'frontend-agent-chat',
+		'context'       => (string) ( $session['context'] ?? 'frontend-agent-chat' ),
 		'first_message' => frontend_agent_chat_first_user_message( $messages ),
 		'message_count' => count( $messages ),
 		'unread_count'  => (int) ( $session['unread_count'] ?? 0 ),
 		'created_at'    => (string) ( $session['created_at'] ?? '' ),
 		'updated_at'    => (string) ( $session['updated_at'] ?? '' ),
 	);
-}
-
-/**
- * Generate a widget session ID.
- *
- * @return string
- */
-function frontend_agent_chat_generate_session_id(): string {
-	return 'fac_' . wp_generate_uuid4();
 }
 
 /**

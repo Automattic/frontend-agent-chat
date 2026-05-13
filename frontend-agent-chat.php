@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Frontend Agent Chat
  * Plugin URI: https://github.com/Extra-Chill/frontend-agent-chat
- * Description: Floating agent chat widget for WordPress agents. Uses the canonical Agents API chat ability with a compatibility adapter for existing Data Machine installs.
+ * Description: Floating agent chat widget for WordPress agents powered by Agents API abilities.
  * Version: 0.7.3
  * Author: Chris Huber
  * Author URI: https://chubes.net
@@ -25,12 +25,6 @@ define( 'FRONTEND_AGENT_CHAT_VERSION', '0.7.3' );
 define( 'FRONTEND_AGENT_CHAT_PLUGIN_FILE', __FILE__ );
 define( 'FRONTEND_AGENT_CHAT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FRONTEND_AGENT_CHAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-
-// Backward-compatible constant aliases for existing integrations.
-define( 'DATA_MACHINE_FRONTEND_CHAT_VERSION', FRONTEND_AGENT_CHAT_VERSION );
-define( 'DATA_MACHINE_FRONTEND_CHAT_PLUGIN_FILE', FRONTEND_AGENT_CHAT_PLUGIN_FILE );
-define( 'DATA_MACHINE_FRONTEND_CHAT_PLUGIN_DIR', FRONTEND_AGENT_CHAT_PLUGIN_DIR );
-define( 'DATA_MACHINE_FRONTEND_CHAT_PLUGIN_URL', FRONTEND_AGENT_CHAT_PLUGIN_URL );
 
 require_once FRONTEND_AGENT_CHAT_PLUGIN_DIR . 'inc/config.php';
 require_once FRONTEND_AGENT_CHAT_PLUGIN_DIR . 'inc/rest.php';

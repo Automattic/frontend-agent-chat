@@ -8,7 +8,7 @@
  * When AI uses a pending-action tool (edit_post_blocks, replace_post_blocks,
  * insert_content) with preview mode, the tool result is rendered as a
  * DiffCard with Accept/Reject buttons instead of raw JSON. Accept/Reject
- * hit the runtime's pending-action resolution endpoint when available.
+ * hit the frontend adapter's Agents API pending-action resolution endpoint.
  *
  * @package
  * @since 0.3.0
@@ -61,21 +61,16 @@ function parseDiffFromToolResult( group: ToolGroup ): DiffData | null {
 /**
  * Resolve a pending action by id.
  *
- * Data Machine unified its preview primitive on a generic pending-action
- * model in PR #1171 (editor #5): the old /datamachine/v1/diff/resolve
- * endpoint and `diff_id` parameter were removed in favour of
- * /datamachine/v1/actions/resolve with `action_id`. The unified endpoint
- * handles every preview-capable tool kind, not just content diffs, so
- * this callback works uniformly for edit_post_blocks, replace_post_blocks,
- * insert_content, and any future kind a plugin registers on the
- * `datamachine_pending_action_handlers` filter.
+ * The server route dispatches to the canonical `agents/resolve-pending-action`
+ * ability so tool preview resolution stays independent from the concrete
+ * runtime/store implementation.
  *
  * @param actionId Pending action ID.
  * @param decision Resolution decision.
  */
 function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejected' ): void {
 	apiFetch( {
-		path: '/datamachine/v1/actions/resolve',
+		path: '/frontend-agent-chat/v1/chat/actions/resolve',
 		method: 'POST',
 		data: { action_id: actionId, decision },
 	} ).catch( ( err: unknown ) => {
@@ -169,12 +164,12 @@ export default function AgentChat( {
 
 	return createElement(
 		'div',
-		{ className: 'datamachine-chat' },
+		{ className: 'frontend-agent-chat' },
 		createElement(
 			'button',
 			{
 				type: 'button',
-				className: `datamachine-chat__fab${ isOpen ? ' is-hidden' : '' }`,
+				className: `frontend-agent-chat__fab${ isOpen ? ' is-hidden' : '' }`,
 				onClick: open,
 				'aria-label': sprintf(
 					/* translators: %s: agent name. */
@@ -186,29 +181,29 @@ export default function AgentChat( {
 			unreadCount > 0 &&
 				createElement(
 					'span',
-					{ className: 'datamachine-chat__fab-badge' },
+					{ className: 'frontend-agent-chat__fab-badge' },
 					unreadCount > 99 ? '99+' : unreadCount
 				)
 		),
 		createElement(
 			'div',
 			{
-				className: `datamachine-chat__drawer${ isOpen ? ' is-open' : '' }`,
+				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }`,
 				'aria-hidden': ! isOpen,
 			},
 			createElement(
 				'div',
-				{ className: 'datamachine-chat__header' },
+				{ className: 'frontend-agent-chat__header' },
 				createElement(
 					'span',
-					{ className: 'datamachine-chat__title' },
+					{ className: 'frontend-agent-chat__title' },
 					agentName
 				),
 				createElement(
 					'button',
 					{
 						type: 'button',
-						className: 'datamachine-chat__close',
+						className: 'frontend-agent-chat__close',
 						onClick: close,
 						'aria-label': __( 'Close', 'frontend-agent-chat' ),
 					},
@@ -217,7 +212,7 @@ export default function AgentChat( {
 			),
 			createElement(
 				'div',
-				{ className: 'datamachine-chat__body' },
+				{ className: 'frontend-agent-chat__body' },
 				createElement( Chat, {
 					basePath,
 					fetchFn: agentFetch,
@@ -234,7 +229,7 @@ export default function AgentChat( {
 					onUnreadChange: setUnreadCount,
 					emptyState: createElement(
 						'div',
-						{ className: 'datamachine-chat__empty' },
+						{ className: 'frontend-agent-chat__empty' },
 						createElement( 'h3', null, agentName ),
 						createElement( 'p', null, agentDescription )
 					),

@@ -96,21 +96,3 @@ function frontend_agent_chat_render_container() {
 	echo '<div data-frontend-agent-chat></div>';
 }
 add_action( 'wp_footer', 'frontend_agent_chat_render_container', 50 );
-
-/**
- * Backward-compatible enqueue wrapper.
- *
- * @return void
- */
-function data_machine_frontend_chat_enqueue() {
-	frontend_agent_chat_enqueue();
-}
-
-/**
- * Backward-compatible container wrapper.
- *
- * @return void
- */
-function data_machine_frontend_chat_render_container() {
-	frontend_agent_chat_render_container();
-}
