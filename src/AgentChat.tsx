@@ -24,7 +24,7 @@ import {
 	parseCanonicalDiffFromToolGroup,
 } from '@extrachill/chat';
 import type { ToolGroup, DiffData, FetchFn, MediaUploadFn } from '@extrachill/chat';
-import type { ReactNode } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 
 /**
  * WordPress dependencies
@@ -34,14 +34,28 @@ import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 
 interface AgentChatProps {
-	agentSlug: string;
+	agentSlug?: string;
 	basePath: string;
+	agentsPath: string;
 	agentName: string;
 	agentDescription: string;
 	loadingMessages?: boolean | {
 		mode?: 'default' | 'extend' | 'override';
 		messages?: string[];
 		interval?: number;
+	};
+}
+
+interface AgentSummary {
+	slug: string;
+	name: string;
+	description: string;
+}
+
+interface AgentsResponse {
+	success?: boolean;
+	data?: {
+		agents?: AgentSummary[];
 	};
 }
 
@@ -80,14 +94,21 @@ function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejecte
 }
 
 function createAgentFetch( agentSlug: string ): FetchFn {
-	return ( options ) => apiFetch( {
-		path: options.path,
-		method: options.method,
-		data: options.method === 'POST'
-			? { ...( options.data ?? {} ), agent: agentSlug }
-			: options.data,
-		headers: options.headers,
-	} );
+	return ( options ) => {
+		const method = options.method ?? 'GET';
+		const separator = options.path.includes( '?' ) ? '&' : '?';
+
+		return apiFetch( {
+			path: method === 'GET' || method === 'DELETE'
+				? `${ options.path }${ separator }agent=${ encodeURIComponent( agentSlug ) }`
+				: options.path,
+			method: options.method,
+			data: method === 'POST'
+				? { ...( options.data ?? {} ), agent: agentSlug }
+				: options.data,
+			headers: options.headers,
+		} );
+	};
 }
 
 /**
@@ -131,16 +152,60 @@ function renderDiffCard( group: ToolGroup ): ReactNode {
 export default function AgentChat( {
 	agentSlug,
 	basePath,
+	agentsPath,
 	agentName,
 	agentDescription,
 	loadingMessages = true,
 }: AgentChatProps ) {
 	const [ isOpen, setIsOpen ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
+	const [ agents, setAgents ] = useState< AgentSummary[] >( () => agentSlug ? [ {
+		slug: agentSlug,
+		name: agentName,
+		description: agentDescription,
+	} ] : [] );
+	const [ selectedAgentSlug, setSelectedAgentSlug ] = useState( agentSlug ?? '' );
 	const metadata = useClientContextMetadata();
-	const agentFetch = useMemo( () => createAgentFetch( agentSlug ), [ agentSlug ] );
+	const selectedAgent = useMemo(
+		() => agents.find( ( agent ) => agent.slug === selectedAgentSlug ) ?? agents[0],
+		[ agents, selectedAgentSlug ]
+	);
+	const activeAgentSlug = selectedAgent?.slug ?? '';
+	const activeAgentName = selectedAgent?.name ?? agentName;
+	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
+	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => setIsOpen( false ), [] );
+	const switchAgent = useCallback( ( event: ChangeEvent< HTMLSelectElement > ) => {
+		setSelectedAgentSlug( event.target.value );
+	}, [] );
+
+	useEffect( () => {
+		apiFetch( { path: agentsPath } )
+			.then( ( response ) => {
+				const nextAgents = ( response as AgentsResponse ).data?.agents ?? [];
+				if ( nextAgents.length === 0 ) {
+					return;
+				}
+
+				setAgents( nextAgents );
+				setSelectedAgentSlug( ( current ) => {
+					if ( current && nextAgents.some( ( agent ) => agent.slug === current ) ) {
+						return current;
+					}
+
+					return nextAgents[0].slug;
+				} );
+			} )
+			.catch( ( err: unknown ) => {
+				// eslint-disable-next-line no-console
+				console.error( 'AgentChat: failed to load accessible agents', err );
+			} );
+	}, [ agentsPath ] );
+
+	useEffect( () => {
+		setUnreadCount( 0 );
+	}, [ activeAgentSlug ] );
 
 	// Close drawer on Escape key.
 	useEffect( () => {
@@ -174,10 +239,10 @@ export default function AgentChat( {
 				'aria-label': sprintf(
 					/* translators: %s: agent name. */
 					__( 'Open %s chat', 'frontend-agent-chat' ),
-					agentName
+					activeAgentName
 				),
 			},
-			agentName,
+			activeAgentName,
 			unreadCount > 0 &&
 				createElement(
 					'span',
@@ -195,9 +260,26 @@ export default function AgentChat( {
 				'div',
 				{ className: 'frontend-agent-chat__header' },
 				createElement(
-					'span',
-					{ className: 'frontend-agent-chat__title' },
-					agentName
+					'div',
+					{ className: 'frontend-agent-chat__agent' },
+					agents.length > 1 ? createElement(
+						'select',
+						{
+							className: 'frontend-agent-chat__agent-select',
+							value: activeAgentSlug,
+							onChange: switchAgent,
+							'aria-label': __( 'Select chat agent', 'frontend-agent-chat' ),
+						},
+						agents.map( ( agent ) => createElement(
+							'option',
+							{ key: agent.slug, value: agent.slug },
+							agent.name
+						) )
+					) : createElement(
+						'span',
+						{ className: 'frontend-agent-chat__title' },
+						activeAgentName
+					)
 				),
 				createElement(
 					'button',
@@ -213,7 +295,8 @@ export default function AgentChat( {
 			createElement(
 				'div',
 				{ className: 'frontend-agent-chat__body' },
-				createElement( Chat, {
+				activeAgentSlug && createElement( Chat, {
+					key: activeAgentSlug,
 					basePath,
 					fetchFn: agentFetch,
 					showTools: true,
@@ -222,7 +305,7 @@ export default function AgentChat( {
 					placeholder: sprintf(
 						/* translators: %s: agent name. */
 						__( 'Ask %s anything…', 'frontend-agent-chat' ),
-						agentName
+						activeAgentName
 					),
 					metadata,
 					isVisible: isOpen,
@@ -230,8 +313,8 @@ export default function AgentChat( {
 					emptyState: createElement(
 						'div',
 						{ className: 'frontend-agent-chat__empty' },
-						createElement( 'h3', null, agentName ),
-						createElement( 'p', null, agentDescription )
+						createElement( 'h3', null, activeAgentName ),
+						createElement( 'p', null, activeAgentDescription )
 					),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,

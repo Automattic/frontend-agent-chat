@@ -22,18 +22,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 function frontend_agent_chat_enqueue() {
 	$config = frontend_agent_chat_get_config();
 
-	if ( empty( $config['enabled'] ) || empty( $config['agent_slug'] ) ) {
+	if ( empty( $config['enabled'] ) ) {
 		return;
 	}
 
-	$agent = frontend_agent_chat_resolve_agent( $config['agent_slug'] );
-	if ( ! $agent ) {
+	$agents = frontend_agent_chat_list_accessible_agents();
+	if ( empty( $agents ) ) {
 		return;
 	}
 
-	if ( ! frontend_agent_chat_user_can_see( $agent ) ) {
-		return;
+	$agent = null;
+	if ( ! empty( $config['agent_slug'] ) ) {
+		$agent = frontend_agent_chat_resolve_agent( (string) $config['agent_slug'] );
 	}
+	$agent = $agent ?: $agents[0];
 
 	$build_dir = FRONTEND_AGENT_CHAT_PLUGIN_DIR . 'build/';
 	$build_url = FRONTEND_AGENT_CHAT_PLUGIN_URL . 'build/';
@@ -65,6 +67,7 @@ function frontend_agent_chat_enqueue() {
 	$js_config = array(
 		'agentSlug'        => (string) ( $agent['agent_slug'] ?? $config['agent_slug'] ),
 		'basePath'         => '/frontend-agent-chat/v1/chat',
+		'agentsPath'       => '/frontend-agent-chat/v1/agents',
 		'agentName'        => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $config['agent_slug'] ),
 		'agentDescription' => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
 	);

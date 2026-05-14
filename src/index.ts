@@ -28,8 +28,9 @@ import AgentChat from './AgentChat';
 declare global {
 	interface Window {
 		frontendAgentChatConfig?: {
-			agentSlug: string;
+			agentSlug?: string;
 			basePath: string;
+			agentsPath: string;
 			agentName: string;
 			agentDescription: string;
 			loadingMessages?: boolean | {
@@ -60,7 +61,7 @@ function init(): void {
 	}
 
 	const config = window.frontendAgentChatConfig;
-	if ( ! config?.agentSlug ) {
+	if ( ! config?.basePath || ! config?.agentsPath ) {
 		return;
 	}
 
@@ -70,6 +71,7 @@ function init(): void {
 		createElement( AgentChat, {
 			agentSlug: config.agentSlug,
 			basePath: config.basePath,
+			agentsPath: config.agentsPath,
 			agentName: config.agentName,
 			agentDescription: config.agentDescription,
 			loadingMessages: config.loadingMessages ?? true,

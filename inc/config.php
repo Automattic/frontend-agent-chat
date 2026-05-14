@@ -66,6 +66,49 @@ function frontend_agent_chat_user_can_see( ?array $agent ): bool {
 }
 
 /**
+ * List accessible Agents API agents for the current user.
+ *
+ * @return array<int,array{agent_slug:string,agent_name:string,agent_description:string,meta:array}>
+ */
+function frontend_agent_chat_list_accessible_agents(): array {
+	$minimum_role = class_exists( 'WP_Agent_Access_Grant' ) ? WP_Agent_Access_Grant::ROLE_VIEWER : 'viewer';
+	$result       = frontend_agent_chat_execute_ability( 'agents/list-accessible-agents', array( 'minimum_role' => $minimum_role ) );
+	$agents       = is_array( $result ) && is_array( $result['agents'] ?? null ) ? $result['agents'] : array();
+	$normalized   = array();
+
+	foreach ( $agents as $agent ) {
+		$agent = frontend_agent_chat_normalize_agent( is_array( $agent ) ? $agent : array() );
+		if ( ! $agent ) {
+			continue;
+		}
+
+		$normalized[] = $agent;
+	}
+
+	return $normalized;
+}
+
+/**
+ * Normalize an Agents API descriptor for frontend chat use.
+ *
+ * @param array $agent Raw agent descriptor.
+ * @return array|null Normalized descriptor or null.
+ */
+function frontend_agent_chat_normalize_agent( array $agent ): ?array {
+	$slug = sanitize_title( (string) ( $agent['slug'] ?? $agent['agent_slug'] ?? '' ) );
+	if ( '' === $slug ) {
+		return null;
+	}
+
+	return array(
+		'agent_slug'        => $slug,
+		'agent_name'        => (string) ( $agent['label'] ?? $agent['agent_name'] ?? $slug ),
+		'agent_description' => (string) ( $agent['description'] ?? $agent['agent_description'] ?? '' ),
+		'meta'              => is_array( $agent['meta'] ?? null ) ? $agent['meta'] : array(),
+	);
+}
+
+/**
  * Check agent access through Agents API.
  *
  * @param string $agent_slug   Registered agent slug/id.
@@ -110,21 +153,12 @@ function frontend_agent_chat_resolve_agent( string $slug ): ?array {
 		return null;
 	}
 
-	$minimum_role = class_exists( 'WP_Agent_Access_Grant' ) ? WP_Agent_Access_Grant::ROLE_VIEWER : 'viewer';
-	$result       = frontend_agent_chat_execute_ability( 'agents/list-accessible-agents', array( 'minimum_role' => $minimum_role ) );
-	$agents       = is_array( $result ) && is_array( $result['agents'] ?? null ) ? $result['agents'] : array();
-
-	foreach ( $agents as $agent ) {
-		if ( ! is_array( $agent ) || sanitize_title( (string) ( $agent['slug'] ?? '' ) ) !== $slug ) {
+	foreach ( frontend_agent_chat_list_accessible_agents() as $agent ) {
+		if ( $agent['agent_slug'] !== $slug ) {
 			continue;
 		}
 
-		return array(
-			'agent_slug'        => (string) ( $agent['slug'] ?? '' ),
-			'agent_name'        => (string) ( $agent['label'] ?? $agent['slug'] ?? '' ),
-			'agent_description' => (string) ( $agent['description'] ?? '' ),
-			'meta'              => is_array( $agent['meta'] ?? null ) ? $agent['meta'] : array(),
-		);
+		return $agent;
 	}
 
 	return null;
