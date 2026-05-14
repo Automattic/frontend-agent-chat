@@ -185,7 +185,7 @@ export default function AgentChat( {
 	const activeAgentSlug = selectedAgent?.slug ?? '';
 	const activeAgentName = selectedAgent?.name ?? agentName;
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
-	const fabLabel = __( 'Consult Intelligence', 'frontend-agent-chat' );
+	const fabLabel = __( '🧠 Brain Chat', 'frontend-agent-chat' );
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => setIsOpen( false ), [] );
