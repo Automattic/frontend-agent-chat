@@ -278,20 +278,32 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 	}
 
 	$attachments = $request->get_param( 'attachments' );
-	$result      = frontend_agent_chat_execute_ability(
-		'agents/chat',
-		array(
-			'agent'          => $agent_slug,
-			'message'        => $message,
-			'session_id'     => $session_id,
-			'attachments'    => is_array( $attachments ) ? $attachments : array(),
-			'client_context' => array(
-				'source'       => 'rest',
-				'client_name'  => 'frontend-agent-chat',
-				'connector_id' => 'frontend-agent-chat',
-			),
-		)
+	$chat_input  = array(
+		'agent'          => $agent_slug,
+		'message'        => $message,
+		'session_id'     => $session_id,
+		'attachments'    => is_array( $attachments ) ? $attachments : array(),
+		'client_context' => array(
+			'source'       => 'rest',
+			'client_name'  => 'frontend-agent-chat',
+			'connector_id' => 'frontend-agent-chat',
+		),
 	);
+
+	/**
+	 * Filter the canonical agents/chat input sent by the frontend chat widget.
+	 *
+	 * Domain plugins can use this to add runtime context, such as a Data Machine
+	 * execution mode, without hardcoding product-specific behavior here.
+	 *
+	 * @param array           $chat_input Canonical agents/chat input.
+	 * @param WP_REST_Request $request    REST request.
+	 * @param string          $agent_slug Selected agent slug.
+	 * @param array           $config     Frontend chat configuration.
+	 */
+	$chat_input = apply_filters( 'frontend_agent_chat_chat_input', $chat_input, $request, $agent_slug, $config );
+
+	$result = frontend_agent_chat_execute_ability( 'agents/chat', is_array( $chat_input ) ? $chat_input : array() );
 
 	if ( is_wp_error( $result ) ) {
 		return $result;
