@@ -27,6 +27,23 @@ function frontend_agent_chat_register_rest_routes(): void {
 
 	register_rest_route(
 		'frontend-agent-chat/v1',
+		'/agents/active',
+		array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => 'frontend_agent_chat_rest_get_active_agent',
+				'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+			),
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => 'frontend_agent_chat_rest_set_active_agent',
+				'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+			),
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
 		'/chat',
 		array(
 			'methods'             => WP_REST_Server::CREATABLE,
@@ -127,12 +144,63 @@ function frontend_agent_chat_rest_can_chat( ?WP_REST_Request $request = null ): 
  * @return WP_REST_Response
  */
 function frontend_agent_chat_rest_list_agents(): WP_REST_Response {
-	$agents = frontend_agent_chat_list_accessible_agents();
+	$agents      = frontend_agent_chat_list_accessible_agents();
+	$active_slug = frontend_agent_chat_get_active_agent_slug();
 	return rest_ensure_response(
 		array(
 			'success' => true,
 			'data'    => array(
-				'agents' => array_map( 'frontend_agent_chat_rest_agent_summary', $agents ),
+				'active_agent_slug' => $active_slug,
+				'agents'            => array_map( 'frontend_agent_chat_rest_agent_summary', $agents ),
+			),
+		)
+	);
+}
+
+/**
+ * Get the current user's active Data Machine agent preference.
+ *
+ * @return WP_REST_Response
+ */
+function frontend_agent_chat_rest_get_active_agent(): WP_REST_Response {
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => array(
+				'agent_slug' => frontend_agent_chat_get_active_agent_slug(),
+			),
+		)
+	);
+}
+
+/**
+ * Persist the current user's active Data Machine agent preference.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_set_active_agent( WP_REST_Request $request ) {
+	$agent_slug = sanitize_title( (string) $request->get_param( 'agent' ) );
+	if ( '' === $agent_slug ) {
+		$agent_slug = sanitize_title( (string) $request->get_param( 'agent_slug' ) );
+	}
+	if ( '' === $agent_slug ) {
+		return new WP_Error( 'frontend_agent_chat_missing_agent', __( 'Agent is required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$result = frontend_agent_chat_execute_ability( 'datamachine/set-active-agent', array( 'agent' => $agent_slug ) );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+	if ( empty( $result['success'] ) ) {
+		return new WP_Error( 'frontend_agent_chat_active_agent_failed', (string) ( $result['error'] ?? __( 'Failed to set active agent.', 'frontend-agent-chat' ) ), array( 'status' => 400 ) );
+	}
+
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => array(
+				'agent_slug' => sanitize_title( (string) ( $result['agent_slug'] ?? $agent_slug ) ),
 			),
 		)
 	);

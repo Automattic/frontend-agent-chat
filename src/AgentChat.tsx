@@ -55,6 +55,7 @@ interface AgentSummary {
 interface AgentsResponse {
 	success?: boolean;
 	data?: {
+		active_agent_slug?: string;
 		agents?: AgentSummary[];
 	};
 }
@@ -109,6 +110,17 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 			headers: options.headers,
 		} );
 	};
+}
+
+function persistActiveAgent( agentSlug: string ): void {
+	apiFetch( {
+		path: '/frontend-agent-chat/v1/agents/active',
+		method: 'POST',
+		data: { agent: agentSlug },
+	} ).catch( ( err: unknown ) => {
+		// eslint-disable-next-line no-console
+		console.error( 'AgentChat: failed to persist active agent', agentSlug, err );
+	} );
 }
 
 /**
@@ -167,23 +179,27 @@ export default function AgentChat( {
 	const [ selectedAgentSlug, setSelectedAgentSlug ] = useState( agentSlug ?? '' );
 	const metadata = useClientContextMetadata();
 	const selectedAgent = useMemo(
-		() => agents.find( ( agent ) => agent.slug === selectedAgentSlug ) ?? agents[0],
+		() => agents.find( ( agent ) => agent.slug === selectedAgentSlug ),
 		[ agents, selectedAgentSlug ]
 	);
 	const activeAgentSlug = selectedAgent?.slug ?? '';
 	const activeAgentName = selectedAgent?.name ?? agentName;
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
+	const fabLabel = __( 'Consult Intelligence', 'frontend-agent-chat' );
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => setIsOpen( false ), [] );
 	const switchAgent = useCallback( ( event: ChangeEvent< HTMLSelectElement > ) => {
-		setSelectedAgentSlug( event.target.value );
+		const nextAgentSlug = event.target.value;
+		setSelectedAgentSlug( nextAgentSlug );
+		persistActiveAgent( nextAgentSlug );
 	}, [] );
 
 	useEffect( () => {
 		apiFetch( { path: agentsPath } )
 			.then( ( response ) => {
-				const nextAgents = ( response as AgentsResponse ).data?.agents ?? [];
+				const data = ( response as AgentsResponse ).data ?? {};
+				const nextAgents = data.agents ?? [];
 				if ( nextAgents.length === 0 ) {
 					return;
 				}
@@ -192,6 +208,11 @@ export default function AgentChat( {
 				setSelectedAgentSlug( ( current ) => {
 					if ( current && nextAgents.some( ( agent ) => agent.slug === current ) ) {
 						return current;
+					}
+
+					const activeAgentSlug = data.active_agent_slug ?? '';
+					if ( activeAgentSlug && nextAgents.some( ( agent ) => agent.slug === activeAgentSlug ) ) {
+						return activeAgentSlug;
 					}
 
 					return nextAgents[0].slug;
@@ -242,7 +263,7 @@ export default function AgentChat( {
 					activeAgentName
 				),
 			},
-			activeAgentName,
+			fabLabel,
 			unreadCount > 0 &&
 				createElement(
 					'span',

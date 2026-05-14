@@ -89,6 +89,20 @@ function frontend_agent_chat_list_accessible_agents(): array {
 }
 
 /**
+ * Read the current user's active Data Machine agent preference when available.
+ *
+ * @return string Active agent slug or empty string.
+ */
+function frontend_agent_chat_get_active_agent_slug(): string {
+	$result = frontend_agent_chat_execute_ability( 'datamachine/get-active-agent', array() );
+	if ( is_wp_error( $result ) || ! is_array( $result ) || empty( $result['success'] ) ) {
+		return '';
+	}
+
+	return sanitize_title( (string) ( $result['agent_slug'] ?? '' ) );
+}
+
+/**
  * Normalize an Agents API descriptor for frontend chat use.
  *
  * @param array $agent Raw agent descriptor.
