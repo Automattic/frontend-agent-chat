@@ -553,6 +553,10 @@ function frontend_agent_chat_session_messages( array $source ): array {
 			continue;
 		}
 
+		if ( in_array( (string) ( $message['type'] ?? '' ), array( 'tool_call', 'tool_result' ), true ) ) {
+			continue;
+		}
+
 		$role = (string) $message['role'];
 		if ( ! in_array( $role, array( 'user', 'assistant' ), true ) ) {
 			continue;
