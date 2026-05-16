@@ -441,7 +441,7 @@ function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ) {
 		frontend_agent_chat_add_browser_principal_input( array(
 			'limit'   => $limit,
 			'agent'   => $agent_slug,
-			'context' => 'frontend-agent-chat',
+			'context' => 'chat',
 		) )
 	);
 
