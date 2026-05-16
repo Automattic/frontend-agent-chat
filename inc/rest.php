@@ -436,13 +436,28 @@ function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ) {
 		return new WP_Error( 'frontend_agent_chat_missing_agent', __( 'Agent is required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$result      = frontend_agent_chat_execute_ability(
+	$list_input = array(
+		'limit'   => $limit,
+		'agent'   => $agent_slug,
+		'context' => 'chat',
+	);
+
+	/**
+	 * Filter the canonical agents/list-conversation-sessions input sent by the frontend chat widget.
+	 *
+	 * Domain plugins can keep transcript listing aligned with any custom chat
+	 * execution context they add via frontend_agent_chat_chat_input.
+	 *
+	 * @param array           $list_input Canonical agents/list-conversation-sessions input.
+	 * @param WP_REST_Request $request    REST request.
+	 * @param string          $agent_slug Selected agent slug.
+	 * @param array           $config     Frontend chat configuration.
+	 */
+	$list_input = apply_filters( 'frontend_agent_chat_session_list_input', $list_input, $request, $agent_slug, $config );
+
+	$result = frontend_agent_chat_execute_ability(
 		'agents/list-conversation-sessions',
-		frontend_agent_chat_add_browser_principal_input( array(
-			'limit'   => $limit,
-			'agent'   => $agent_slug,
-			'context' => 'frontend-agent-chat',
-		) )
+		frontend_agent_chat_add_browser_principal_input( is_array( $list_input ) ? $list_input : array() )
 	);
 
 	if ( is_wp_error( $result ) ) {
