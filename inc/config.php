@@ -250,6 +250,11 @@ function frontend_agent_chat_add_browser_principal_input( array $input ): array 
 
 	$input['principal']         = $principal;
 	$input['browser_principal'] = $principal;
+	$input['transcript_owner']  = array(
+		'type'  => 'browser',
+		'key'   => $principal['id'],
+		'label' => 'Browser chat session',
+	);
 	return $input;
 }
 
