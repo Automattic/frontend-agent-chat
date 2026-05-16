@@ -248,7 +248,21 @@ function frontend_agent_chat_add_browser_principal_input( array $input ): array 
 		return $input;
 	}
 
-	$input['principal']         = $principal;
+	$agent_slug = sanitize_title( (string) ( $input['agent'] ?? '' ) );
+
+	$input['principal']         = array(
+		'acting_user_id'     => 0,
+		'effective_agent_id' => '' !== $agent_slug ? $agent_slug : 'frontend-agent-chat',
+		'auth_source'        => 'audience',
+		'request_context'    => 'rest',
+		'client_id'          => 'frontend-agent-chat',
+		'audience_id'        => 'browser',
+		'audience_claims'    => array(
+			'browser_principal_id' => $principal['id'],
+		),
+		'owner_type'         => 'browser',
+		'owner_key'          => $principal['id'],
+	);
 	$input['browser_principal'] = $principal;
 	$input['transcript_owner']  = array(
 		'type'  => 'browser',
