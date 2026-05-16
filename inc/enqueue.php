@@ -74,6 +74,27 @@ function frontend_agent_chat_enqueue() {
 		'isLoggedIn'       => is_user_logged_in(),
 	);
 
+	/**
+	 * Filter anonymous chat persistence CTA data.
+	 *
+	 * Domain plugins can provide a product-specific sign-in or account-linking
+	 * action without coupling this generic widget to a concrete identity provider.
+	 * Return an array with `message`, `action_label`, and `action_url`, or an empty
+	 * array to show the generic browser-cookie persistence message.
+	 *
+	 * @param array $cta    CTA data.
+	 * @param array $config Frontend chat configuration.
+	 * @param array $agent  Selected agent descriptor.
+	 */
+	$persistence_cta = apply_filters( 'frontend_agent_chat_persistence_cta', array(), $config, $agent );
+	if ( is_array( $persistence_cta ) && ! empty( $persistence_cta['action_url'] ) ) {
+		$js_config['persistenceCta'] = array(
+			'message'     => sanitize_text_field( (string) ( $persistence_cta['message'] ?? '' ) ),
+			'actionLabel' => sanitize_text_field( (string) ( $persistence_cta['action_label'] ?? '' ) ),
+			'actionUrl'   => esc_url_raw( (string) $persistence_cta['action_url'] ),
+		);
+	}
+
 	if ( ! empty( $config['loading_messages'] ) ) {
 		$js_config['loadingMessages'] = $config['loading_messages'];
 	}

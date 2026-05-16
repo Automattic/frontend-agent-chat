@@ -46,6 +46,11 @@ interface AgentChatProps {
 		messages?: string[];
 		interval?: number;
 	};
+	persistenceCta?: {
+		message?: string;
+		actionLabel?: string;
+		actionUrl?: string;
+	};
 }
 
 interface BootstrapResponse {
@@ -194,6 +199,7 @@ export default function AgentChat( {
 	agentDescription,
 	isLoggedIn = false,
 	loadingMessages = true,
+	persistenceCta,
 }: AgentChatProps ) {
 	const [ isOpen, setIsOpen ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
@@ -294,6 +300,9 @@ export default function AgentChat( {
 		} ),
 		[]
 	);
+	const persistenceMessage = browserBootstrapFailed
+		? __( 'Chat works, but this browser is blocking secure chat-history cookies.', 'frontend-agent-chat' )
+		: ( persistenceCta?.message || __( 'This browser can keep chat history with a secure cookie.', 'frontend-agent-chat' ) );
 
 	return createElement(
 		'div',
@@ -367,9 +376,15 @@ export default function AgentChat( {
 				! isLoggedIn && createElement(
 					'div',
 					{ className: `frontend-agent-chat__persistence${ browserBootstrapFailed ? ' has-warning' : '' }` },
-					browserBootstrapFailed
-						? __( 'Chat works, but this browser is blocking secure chat-history cookies.', 'frontend-agent-chat' )
-						: __( 'This browser can keep chat history with a secure cookie. Sign in with WordPress.com to save chat history across devices.', 'frontend-agent-chat' )
+					persistenceMessage,
+					! browserBootstrapFailed && persistenceCta?.actionUrl && persistenceCta?.actionLabel && createElement(
+						'a',
+						{
+							className: 'frontend-agent-chat__persistence-action',
+							href: persistenceCta.actionUrl,
+						},
+						persistenceCta.actionLabel
+					)
 				),
 				activeAgentSlug && createElement( Chat, {
 					key: activeAgentSlug,

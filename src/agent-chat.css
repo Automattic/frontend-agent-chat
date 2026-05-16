@@ -236,6 +236,18 @@
 	background: var(--frontend-agent-chat-warning-bg, #fef3c7);
 }
 
+.frontend-agent-chat__persistence-action {
+	display: inline-flex;
+	margin-left: 0.35rem;
+	color: var(--frontend-agent-chat-accent, #2563eb);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.frontend-agent-chat__persistence-action:hover {
+	text-decoration: underline;
+}
+
 .frontend-agent-chat__empty {
 	text-align: center;
 	padding: var(--frontend-agent-chat-spacing-lg, 24px);

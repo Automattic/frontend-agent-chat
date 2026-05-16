@@ -40,6 +40,11 @@ declare global {
 				messages?: string[];
 				interval?: number;
 			};
+			persistenceCta?: {
+				message?: string;
+				actionLabel?: string;
+				actionUrl?: string;
+			};
 		};
 	}
 }
@@ -79,6 +84,7 @@ function init(): void {
 			agentDescription: config.agentDescription,
 			isLoggedIn: config.isLoggedIn ?? false,
 			loadingMessages: config.loadingMessages ?? true,
+			persistenceCta: config.persistenceCta,
 		} )
 	);
 }
