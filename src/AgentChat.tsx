@@ -203,6 +203,7 @@ export default function AgentChat( {
 	persistenceCta,
 }: AgentChatProps ) {
 	const [ isOpen, setIsOpen ] = useState( false );
+	const [ isExpanded, setIsExpanded ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] = useState( isLoggedIn );
 	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] = useState( false );
@@ -223,7 +224,11 @@ export default function AgentChat( {
 	const fabLabel = __( 'Brain Chat', 'frontend-agent-chat' );
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
-	const close = useCallback( () => setIsOpen( false ), [] );
+	const close = useCallback( () => {
+		setIsOpen( false );
+		setIsExpanded( false );
+	}, [] );
+	const toggleExpanded = useCallback( () => setIsExpanded( ( expanded ) => ! expanded ), [] );
 	const switchAgent = useCallback( ( event: ChangeEvent< HTMLSelectElement > ) => {
 		const nextAgentSlug = event.target.value;
 		setSelectedAgentSlug( nextAgentSlug );
@@ -287,16 +292,23 @@ export default function AgentChat( {
 		setUnreadCount( 0 );
 	}, [ activeAgentSlug ] );
 
-	// Close drawer on Escape key.
+	// Escape exits expanded mode first, then closes the drawer.
 	useEffect( () => {
 		function handleKeyDown( e: KeyboardEvent ) {
-			if ( e.key === 'Escape' && isOpen ) {
-				setIsOpen( false );
+			if ( e.key !== 'Escape' || ! isOpen ) {
+				return;
 			}
+
+			if ( isExpanded ) {
+				setIsExpanded( false );
+				return;
+			}
+
+			setIsOpen( false );
 		}
 		document.addEventListener( 'keydown', handleKeyDown );
 		return () => document.removeEventListener( 'keydown', handleKeyDown );
-	}, [ isOpen ] );
+	}, [ isExpanded, isOpen ] );
 
 	const toolRenderers = useMemo(
 		() => ( {
@@ -309,6 +321,9 @@ export default function AgentChat( {
 	const persistenceMessage = browserBootstrapFailed
 		? __( 'Chat works, but this browser is blocking secure chat-history cookies.', 'frontend-agent-chat' )
 		: ( persistenceCta?.message || __( 'This browser can keep chat history with a secure cookie.', 'frontend-agent-chat' ) );
+	const expandedButtonLabel = isExpanded
+		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
+		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
 
 	return createElement(
 		'div',
@@ -337,7 +352,7 @@ export default function AgentChat( {
 		createElement(
 			'div',
 			{
-				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }`,
+				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }${ isExpanded ? ' is-expanded' : '' }`,
 				'aria-hidden': ! isOpen,
 			},
 			createElement(
@@ -366,14 +381,29 @@ export default function AgentChat( {
 					)
 				),
 				createElement(
-					'button',
-					{
-						type: 'button',
-						className: 'frontend-agent-chat__close',
-						onClick: close,
-						'aria-label': __( 'Close', 'frontend-agent-chat' ),
-					},
-					'\u00D7'
+					'div',
+					{ className: 'frontend-agent-chat__header-actions' },
+					createElement(
+						'button',
+						{
+							type: 'button',
+							className: 'frontend-agent-chat__expand',
+							onClick: toggleExpanded,
+							'aria-label': expandedButtonLabel,
+							'aria-pressed': isExpanded,
+						},
+						isExpanded ? '\u2199' : '\u2197'
+					),
+					createElement(
+						'button',
+						{
+							type: 'button',
+							className: 'frontend-agent-chat__close',
+							onClick: close,
+							'aria-label': __( 'Close', 'frontend-agent-chat' ),
+						},
+						'\u00D7'
+					)
 				)
 			),
 			createElement(
