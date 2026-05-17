@@ -70,7 +70,8 @@ function frontend_agent_chat_list_accessible_agents(): array {
 	$minimum_role = class_exists( 'WP_Agent_Access_Grant' ) ? WP_Agent_Access_Grant::ROLE_VIEWER : 'viewer';
 	$result       = frontend_agent_chat_execute_ability( 'agents/list-accessible-agents', array( 'minimum_role' => $minimum_role ) );
 	$agents       = is_array( $result ) && is_array( $result['agents'] ?? null ) ? $result['agents'] : array();
-	$normalized   = array();
+	/** @var array<int,array{agent_slug:string,agent_name:string,agent_description:string,meta:array}> $normalized */
+	$normalized = array();
 
 	foreach ( $agents as $agent ) {
 		$agent = frontend_agent_chat_normalize_agent( is_array( $agent ) ? $agent : array() );
@@ -101,6 +102,29 @@ function frontend_agent_chat_get_active_agent_slug(): string {
 	}
 
 	return sanitize_title( (string) ( $result['agent_slug'] ?? '' ) );
+}
+
+/**
+ * Resolve the default frontend chat agent for the current request.
+ *
+ * This is intentionally separate from the persisted active agent preference:
+ * integrations can make the first-open default match the current page while
+ * still allowing users to switch agents in the widget.
+ *
+ * @param array|null $config Frontend chat configuration, or null to load it.
+ * @return string Default agent slug or empty string.
+ */
+function frontend_agent_chat_get_default_agent_slug( ?array $config = null ): string {
+	$config       = is_array( $config ) ? $config : frontend_agent_chat_get_config();
+	$default_slug = sanitize_title( (string) ( $config['agent_slug'] ?? '' ) );
+
+	/**
+	 * Filter the default frontend chat agent for the current request.
+	 *
+	 * @param string $default_slug Default agent slug.
+	 * @param array  $config       Frontend chat configuration.
+	 */
+	return sanitize_title( (string) apply_filters( 'frontend_agent_chat_default_agent_slug', $default_slug, $config ) );
 }
 
 /**
@@ -276,7 +300,7 @@ function frontend_agent_chat_add_browser_principal_input( array $input ): array 
  * Normalize an Agents API descriptor for frontend chat use.
  *
  * @param array $agent Raw agent descriptor.
- * @return array|null Normalized descriptor or null.
+ * @return array{agent_slug:string,agent_name:string,agent_description:string,meta:array}|null Normalized descriptor or null.
  */
 function frontend_agent_chat_normalize_agent( array $agent ): ?array {
 	$slug = sanitize_title( (string) ( $agent['slug'] ?? $agent['agent_slug'] ?? '' ) );

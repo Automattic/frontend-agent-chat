@@ -128,7 +128,7 @@ add_action( 'rest_api_init', 'frontend_agent_chat_register_rest_routes' );
  */
 function frontend_agent_chat_rest_bootstrap(): WP_REST_Response {
 	$had_principal = null !== frontend_agent_chat_get_browser_principal();
-	$principal = frontend_agent_chat_ensure_browser_principal_cookie();
+	$principal     = frontend_agent_chat_ensure_browser_principal_cookie();
 
 	return rest_ensure_response(
 		array(
@@ -140,7 +140,7 @@ function frontend_agent_chat_rest_bootstrap(): WP_REST_Response {
 				'browser_principal_id'      => is_array( $principal ) ? $principal['id'] : '',
 				'browser_principal_secret'  => false,
 				'session_persistence_scope' => is_user_logged_in() ? 'user' : 'browser',
-			)
+			),
 		)
 	);
 }
@@ -159,7 +159,8 @@ function frontend_agent_chat_rest_can_chat( ?WP_REST_Request $request = null ): 
 		return ! empty( frontend_agent_chat_list_accessible_agents() );
 	}
 
-	$agent_slug = $request ? frontend_agent_chat_rest_get_agent_slug( $request, (string) ( $config['agent_slug'] ?? '' ) ) : (string) ( $config['agent_slug'] ?? '' );
+	$default_agent_slug = frontend_agent_chat_get_default_agent_slug( $config );
+	$agent_slug         = $request ? frontend_agent_chat_rest_get_agent_slug( $request, $default_agent_slug ) : $default_agent_slug;
 	if ( '' === $agent_slug ) {
 		return ! empty( frontend_agent_chat_list_accessible_agents() );
 	}
@@ -178,14 +179,17 @@ function frontend_agent_chat_rest_can_chat( ?WP_REST_Request $request = null ): 
  * @return WP_REST_Response
  */
 function frontend_agent_chat_rest_list_agents(): WP_REST_Response {
-	$agents      = frontend_agent_chat_list_accessible_agents();
-	$active_slug = frontend_agent_chat_get_active_agent_slug();
+	$config       = frontend_agent_chat_get_config();
+	$agents       = frontend_agent_chat_list_accessible_agents();
+	$active_slug  = frontend_agent_chat_get_active_agent_slug();
+	$default_slug = frontend_agent_chat_get_default_agent_slug( $config );
 	return rest_ensure_response(
 		array(
 			'success' => true,
 			'data'    => array(
-				'active_agent_slug' => $active_slug,
-				'agents'            => array_map( 'frontend_agent_chat_rest_agent_summary', $agents ),
+				'active_agent_slug'  => $active_slug,
+				'default_agent_slug' => $default_slug,
+				'agents'             => array_map( 'frontend_agent_chat_rest_agent_summary', $agents ),
 			),
 		)
 	);
@@ -233,7 +237,7 @@ function frontend_agent_chat_rest_set_active_agent( WP_REST_Request $request ) {
 				'success' => true,
 				'data'    => array(
 					'agent_slug' => $agent_slug,
-				)
+				),
 			)
 		);
 	}
@@ -302,9 +306,9 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 		return new WP_Error( 'frontend_agent_chat_empty_message', __( 'Message cannot be empty.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$config      = frontend_agent_chat_get_config();
-	$agent_slug  = frontend_agent_chat_rest_get_agent_slug( $request, (string) ( $config['agent_slug'] ?? '' ) );
-	$session_id  = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	$config     = frontend_agent_chat_get_config();
+	$agent_slug = frontend_agent_chat_rest_get_agent_slug( $request, frontend_agent_chat_get_default_agent_slug( $config ) );
+	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
 	if ( '' === $agent_slug ) {
 		return new WP_Error( 'frontend_agent_chat_missing_agent', __( 'Agent is required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
@@ -333,6 +337,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 	 * @param string          $agent_slug Selected agent slug.
 	 * @param array           $config     Frontend chat configuration.
 	 */
+	/** @var mixed $chat_input */
 	$chat_input = apply_filters( 'frontend_agent_chat_chat_input', $chat_input, $request, $agent_slug, $config );
 
 	$chat_input = frontend_agent_chat_add_browser_principal_input( is_array( $chat_input ) ? $chat_input : array() );
@@ -431,7 +436,7 @@ function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ) {
 	$config      = frontend_agent_chat_get_config();
 	$limit_param = $request->get_param( 'limit' );
 	$limit       = max( 1, min( 100, (int) ( null !== $limit_param ? $limit_param : 20 ) ) );
-	$agent_slug  = frontend_agent_chat_rest_get_agent_slug( $request, (string) ( $config['agent_slug'] ?? '' ) );
+	$agent_slug  = frontend_agent_chat_rest_get_agent_slug( $request, frontend_agent_chat_get_default_agent_slug( $config ) );
 	if ( '' === $agent_slug ) {
 		return new WP_Error( 'frontend_agent_chat_missing_agent', __( 'Agent is required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
@@ -453,6 +458,7 @@ function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ) {
 	 * @param string          $agent_slug Selected agent slug.
 	 * @param array           $config     Frontend chat configuration.
 	 */
+	/** @var mixed $list_input */
 	$list_input = apply_filters( 'frontend_agent_chat_session_list_input', $list_input, $request, $agent_slug, $config );
 
 	$result = frontend_agent_chat_execute_ability(

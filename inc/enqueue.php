@@ -31,11 +31,12 @@ function frontend_agent_chat_enqueue() {
 		return;
 	}
 
-	$agent = null;
-	if ( ! empty( $config['agent_slug'] ) ) {
-		$agent = frontend_agent_chat_resolve_agent( (string) $config['agent_slug'] );
+	$default_agent_slug = frontend_agent_chat_get_default_agent_slug( $config );
+	$agent              = null;
+	if ( '' !== $default_agent_slug ) {
+		$agent = frontend_agent_chat_resolve_agent( $default_agent_slug );
 	}
-	$agent = $agent ?: $agents[0];
+	$agent = $agent ? $agent : $agents[0];
 
 	$build_dir = FRONTEND_AGENT_CHAT_PLUGIN_DIR . 'build/';
 	$build_url = FRONTEND_AGENT_CHAT_PLUGIN_URL . 'build/';
@@ -65,11 +66,11 @@ function frontend_agent_chat_enqueue() {
 	}
 
 	$js_config = array(
-		'agentSlug'        => (string) ( $agent['agent_slug'] ?? $config['agent_slug'] ),
+		'agentSlug'        => (string) ( $agent['agent_slug'] ?? $default_agent_slug ),
 		'basePath'         => '/frontend-agent-chat/v1/chat',
 		'bootstrapPath'    => '/frontend-agent-chat/v1/bootstrap',
 		'agentsPath'       => '/frontend-agent-chat/v1/agents',
-		'agentName'        => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $config['agent_slug'] ),
+		'agentName'        => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $default_agent_slug ),
 		'agentDescription' => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
 		'isLoggedIn'       => is_user_logged_in(),
 	);
@@ -86,6 +87,7 @@ function frontend_agent_chat_enqueue() {
 	 * @param array $config Frontend chat configuration.
 	 * @param array $agent  Selected agent descriptor.
 	 */
+	/** @var mixed $persistence_cta */
 	$persistence_cta = apply_filters( 'frontend_agent_chat_persistence_cta', array(), $config, $agent );
 	if ( is_array( $persistence_cta ) && ! empty( $persistence_cta['action_url'] ) ) {
 		$js_config['persistenceCta'] = array(

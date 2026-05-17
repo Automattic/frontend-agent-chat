@@ -85,6 +85,7 @@ interface AgentsResponse {
 	success?: boolean;
 	data?: {
 		active_agent_slug?: string;
+		default_agent_slug?: string;
 		agents?: AgentSummary[];
 	};
 }
@@ -261,6 +262,11 @@ export default function AgentChat( {
 				setSelectedAgentSlug( ( current ) => {
 					if ( current && nextAgents.some( ( agent ) => agent.slug === current ) ) {
 						return current;
+					}
+
+					const defaultAgentSlug = data.default_agent_slug ?? '';
+					if ( defaultAgentSlug && nextAgents.some( ( agent ) => agent.slug === defaultAgentSlug ) ) {
+						return defaultAgentSlug;
 					}
 
 					const preferredAgentSlug = data.active_agent_slug ?? '';
