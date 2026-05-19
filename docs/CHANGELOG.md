@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.4] - 2026-05-19
+
+### Fixed
+- allow expand icon overrides
+- use svg expand icon
+
 ## [0.8.3] - 2026-05-19
 
 ### Fixed
