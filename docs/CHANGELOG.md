@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1] - 2026-05-18
+
+### Fixed
+- make frontend chat branding configurable
+- improve chat surface legibility
+
 ## [0.8.0] - 2026-05-17
 
 ### Added
