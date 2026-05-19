@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.3] - 2026-05-19
+
+### Fixed
+- update chat UI styles
+- use selectable chat theme colors
+
 ## [0.8.2] - 2026-05-19
 
 ### Fixed
