@@ -11,6 +11,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Sanitize SVG path data for icon configuration.
+ *
+ * Consumers may override icon shapes through frontend_agent_chat_config, but
+ * the widget still owns the SVG element. This keeps the extension point narrow
+ * and avoids passing raw markup to the browser.
+ *
+ * @param mixed $path SVG path data.
+ * @return string Sanitized path data, or empty string when invalid.
+ */
+function frontend_agent_chat_sanitize_svg_path( $path ): string {
+	$path = trim( (string) $path );
+	if ( '' === $path || ! preg_match( '/^[MmZzLlHhVvCcSsQqTtAa0-9.,\-\s]+$/', $path ) ) {
+		return '';
+	}
+
+	return $path;
+}
+
+/**
+ * Sanitize SVG viewBox data for icon configuration.
+ *
+ * @param mixed $view_box SVG viewBox data.
+ * @return string Sanitized viewBox data.
+ */
+function frontend_agent_chat_sanitize_svg_view_box( $view_box ): string {
+	$view_box = trim( (string) $view_box );
+	if ( ! preg_match( '/^-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+\d+(?:\.\d+)?$/', $view_box ) ) {
+		return '0 0 24 24';
+	}
+
+	return $view_box;
+}
+
+/**
  * Enqueue the frontend chat script and styles.
  *
  * Fires on wp_enqueue_scripts so the assets load on every frontend page.
@@ -66,15 +100,18 @@ function frontend_agent_chat_enqueue() {
 	}
 
 	$js_config = array(
-		'agentSlug'        => (string) ( $agent['agent_slug'] ?? $default_agent_slug ),
-		'basePath'         => '/frontend-agent-chat/v1/chat',
-		'bootstrapPath'    => '/frontend-agent-chat/v1/bootstrap',
-		'agentsPath'       => '/frontend-agent-chat/v1/agents',
-		'agentName'        => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $default_agent_slug ),
-		'agentDescription' => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
-		'fabLabel'         => sanitize_text_field( (string) ( $config['fab_label'] ?? __( 'Agent Chat', 'frontend-agent-chat' ) ) ),
-		'fabIcon'          => sanitize_text_field( (string) ( $config['fab_icon'] ?? 'AI' ) ),
-		'isLoggedIn'       => is_user_logged_in(),
+		'agentSlug'         => (string) ( $agent['agent_slug'] ?? $default_agent_slug ),
+		'basePath'          => '/frontend-agent-chat/v1/chat',
+		'bootstrapPath'     => '/frontend-agent-chat/v1/bootstrap',
+		'agentsPath'        => '/frontend-agent-chat/v1/agents',
+		'agentName'         => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $default_agent_slug ),
+		'agentDescription'  => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
+		'fabLabel'          => sanitize_text_field( (string) ( $config['fab_label'] ?? __( 'Agent Chat', 'frontend-agent-chat' ) ) ),
+		'fabIcon'           => sanitize_text_field( (string) ( $config['fab_icon'] ?? 'AI' ) ),
+		'expandIconPath'    => frontend_agent_chat_sanitize_svg_path( $config['expand_icon_path'] ?? '' ),
+		'collapseIconPath'  => frontend_agent_chat_sanitize_svg_path( $config['collapse_icon_path'] ?? '' ),
+		'expandIconViewBox' => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),
+		'isLoggedIn'        => is_user_logged_in(),
 	);
 
 	/**

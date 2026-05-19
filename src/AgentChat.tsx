@@ -42,6 +42,9 @@ interface AgentChatProps {
 	agentDescription: string;
 	fabLabel?: string;
 	fabIcon?: string;
+	expandIconPath?: string;
+	collapseIconPath?: string;
+	expandIconViewBox?: string;
 	isLoggedIn?: boolean;
 	loadingMessages?: boolean | {
 		mode?: 'default' | 'extend' | 'override';
@@ -91,6 +94,9 @@ interface AgentsResponse {
 		agents?: AgentSummary[];
 	};
 }
+
+const DEFAULT_EXPAND_ICON_PATH = 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
+const DEFAULT_COLLAPSE_ICON_PATH = 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5';
 
 /**
  * Parse a tool result into DiffData for DiffCard rendering.
@@ -193,16 +199,12 @@ function renderDiffCard( group: ToolGroup ): ReactNode {
 	} );
 }
 
-function renderExpandIcon( isExpanded: boolean ): ReactNode {
-	const path = isExpanded
-		? 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5'
-		: 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
-
+function renderExpandIcon( path: string, viewBox: string ): ReactNode {
 	return createElement(
 		'svg',
 		{
 			className: 'frontend-agent-chat__expand-icon',
-			viewBox: '0 0 24 24',
+			viewBox,
 			width: 18,
 			height: 18,
 			'aria-hidden': true,
@@ -228,6 +230,9 @@ export default function AgentChat( {
 	agentDescription,
 	fabLabel = __( 'Agent Chat', 'frontend-agent-chat' ),
 	fabIcon = 'AI',
+	expandIconPath,
+	collapseIconPath,
+	expandIconViewBox = '0 0 24 24',
 	isLoggedIn = false,
 	loadingMessages = true,
 	persistenceCta,
@@ -353,6 +358,9 @@ export default function AgentChat( {
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
 		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
+	const expandButtonIconPath = isExpanded
+		? ( collapseIconPath || DEFAULT_COLLAPSE_ICON_PATH )
+		: ( expandIconPath || DEFAULT_EXPAND_ICON_PATH );
 
 	return createElement(
 		'div',
@@ -421,7 +429,7 @@ export default function AgentChat( {
 							'aria-label': expandedButtonLabel,
 							'aria-pressed': isExpanded,
 						},
-						renderExpandIcon( isExpanded )
+						renderExpandIcon( expandButtonIconPath, expandIconViewBox )
 					),
 					createElement(
 						'button',

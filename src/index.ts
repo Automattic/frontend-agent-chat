@@ -36,6 +36,9 @@ declare global {
 			agentDescription: string;
 			fabLabel?: string;
 			fabIcon?: string;
+			expandIconPath?: string;
+			collapseIconPath?: string;
+			expandIconViewBox?: string;
 			isLoggedIn?: boolean;
 			loadingMessages?: boolean | {
 				mode?: 'default' | 'extend' | 'override';
@@ -86,6 +89,9 @@ function init(): void {
 			agentDescription: config.agentDescription,
 			fabLabel: config.fabLabel,
 			fabIcon: config.fabIcon,
+			expandIconPath: config.expandIconPath,
+			collapseIconPath: config.collapseIconPath,
+			expandIconViewBox: config.expandIconViewBox,
 			isLoggedIn: config.isLoggedIn ?? false,
 			loadingMessages: config.loadingMessages ?? true,
 			persistenceCta: config.persistenceCta,
