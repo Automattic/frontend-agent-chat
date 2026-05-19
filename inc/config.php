@@ -19,6 +19,8 @@ function frontend_agent_chat_get_config(): array {
 		'agent_slug'       => '',
 		'description'      => __( 'Your AI assistant.', 'frontend-agent-chat' ),
 		'enabled'          => false,
+		'fab_label'        => __( 'Agent Chat', 'frontend-agent-chat' ),
+		'fab_icon'         => 'AI',
 		'loading_messages' => true,
 	);
 

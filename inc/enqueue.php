@@ -72,6 +72,8 @@ function frontend_agent_chat_enqueue() {
 		'agentsPath'       => '/frontend-agent-chat/v1/agents',
 		'agentName'        => (string) ( $agent['agent_name'] ?? $agent['label'] ?? $default_agent_slug ),
 		'agentDescription' => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
+		'fabLabel'         => sanitize_text_field( (string) ( $config['fab_label'] ?? __( 'Agent Chat', 'frontend-agent-chat' ) ) ),
+		'fabIcon'          => sanitize_text_field( (string) ( $config['fab_icon'] ?? 'AI' ) ),
 		'isLoggedIn'       => is_user_logged_in(),
 	);
 

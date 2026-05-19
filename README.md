@@ -17,6 +17,8 @@ update_option( 'frontend_agent_chat_config', [
     'agent_slug'  => 'my-agent',
     'description' => 'Your AI assistant.',
     'enabled'     => true,
+    'fab_label'   => 'Agent Chat',
+    'fab_icon'    => 'AI',
 ] );
 ```
 
@@ -25,6 +27,8 @@ update_option( 'frontend_agent_chat_config', [
 | `agent_slug` | `string` | Slug of the registered WordPress agent to connect to |
 | `description` | `string` | Shown in the empty state before the first message |
 | `enabled` | `bool` | Toggle the chat on/off for this site |
+| `fab_label` | `string` | Floating action button label |
+| `fab_icon` | `string` | Floating action button icon or short text |
 
 The config can also be overridden via the `frontend_agent_chat_config` filter.
 
