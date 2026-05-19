@@ -16,12 +16,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 function frontend_agent_chat_get_config(): array {
 	$defaults = array(
-		'agent_slug'       => '',
-		'description'      => __( 'Your AI assistant.', 'frontend-agent-chat' ),
-		'enabled'          => false,
-		'fab_label'        => __( 'Agent Chat', 'frontend-agent-chat' ),
-		'fab_icon'         => 'AI',
-		'loading_messages' => true,
+		'agent_slug'           => '',
+		'description'          => __( 'Your AI assistant.', 'frontend-agent-chat' ),
+		'enabled'              => false,
+		'fab_label'            => __( 'Agent Chat', 'frontend-agent-chat' ),
+		'fab_icon'             => 'AI',
+		'expand_icon_path'     => '',
+		'collapse_icon_path'   => '',
+		'expand_icon_view_box' => '0 0 24 24',
+		'loading_messages'     => true,
 	);
 
 	$saved = get_option( 'frontend_agent_chat_config', array() );
