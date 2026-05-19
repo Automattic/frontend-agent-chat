@@ -40,6 +40,8 @@ interface AgentChatProps {
 	agentsPath: string;
 	agentName: string;
 	agentDescription: string;
+	fabLabel?: string;
+	fabIcon?: string;
 	isLoggedIn?: boolean;
 	loadingMessages?: boolean | {
 		mode?: 'default' | 'extend' | 'override';
@@ -198,6 +200,8 @@ export default function AgentChat( {
 	agentsPath,
 	agentName,
 	agentDescription,
+	fabLabel = __( 'Agent Chat', 'frontend-agent-chat' ),
+	fabIcon = 'AI',
 	isLoggedIn = false,
 	loadingMessages = true,
 	persistenceCta,
@@ -221,7 +225,6 @@ export default function AgentChat( {
 	const activeAgentSlug = selectedAgent?.slug ?? '';
 	const activeAgentName = selectedAgent?.name ?? agentName;
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
-	const fabLabel = __( 'Brain Chat', 'frontend-agent-chat' );
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {
@@ -340,7 +343,7 @@ export default function AgentChat( {
 					activeAgentName
 				),
 			},
-			createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, '🧠' ),
+			createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, fabIcon ),
 			createElement( 'span', { className: 'frontend-agent-chat__fab-label' }, fabLabel ),
 			unreadCount > 0 &&
 				createElement(

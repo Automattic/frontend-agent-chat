@@ -34,7 +34,7 @@ $messages = frontend_agent_chat_session_messages(
 			array(
 				'role'    => 'assistant',
 				'type'    => 'tool_call',
-				'content' => 'AI ACTION (Turn 1): Executing Wiki Brain List.',
+				'content' => 'AI ACTION (Turn 1): Executing Data Lookup.',
 			),
 			array(
 				'role'    => 'user',
