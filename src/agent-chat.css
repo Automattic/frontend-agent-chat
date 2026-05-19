@@ -212,6 +212,11 @@
 	outline-offset: 2px;
 }
 
+.frontend-agent-chat__expand-icon {
+	display: block;
+	flex-shrink: 0;
+}
+
 .frontend-agent-chat__body {
 	flex: 1;
 	min-height: 0;

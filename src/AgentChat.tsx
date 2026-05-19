@@ -193,6 +193,32 @@ function renderDiffCard( group: ToolGroup ): ReactNode {
 	} );
 }
 
+function renderExpandIcon( isExpanded: boolean ): ReactNode {
+	const path = isExpanded
+		? 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5'
+		: 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
+
+	return createElement(
+		'svg',
+		{
+			className: 'frontend-agent-chat__expand-icon',
+			viewBox: '0 0 24 24',
+			width: 18,
+			height: 18,
+			'aria-hidden': true,
+			focusable: false,
+		},
+		createElement( 'path', {
+			d: path,
+			fill: 'none',
+			stroke: 'currentColor',
+			strokeLinecap: 'round',
+			strokeLinejoin: 'round',
+			strokeWidth: 2,
+		} )
+	);
+}
+
 export default function AgentChat( {
 	agentSlug,
 	basePath,
@@ -395,7 +421,7 @@ export default function AgentChat( {
 							'aria-label': expandedButtonLabel,
 							'aria-pressed': isExpanded,
 						},
-						isExpanded ? '\u2199' : '\u2197'
+						renderExpandIcon( isExpanded )
 					),
 					createElement(
 						'button',
