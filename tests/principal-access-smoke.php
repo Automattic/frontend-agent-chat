@@ -10,6 +10,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
+if ( ! defined( 'FRONTEND_AGENT_CHAT_BROWSER_COOKIE' ) ) {
+	define( 'FRONTEND_AGENT_CHAT_BROWSER_COOKIE', 'frontend_agent_chat_browser' );
+}
 
 class WP_Agent_Access_Grant {
 	public const ROLE_VIEWER = 'viewer';
@@ -70,6 +73,19 @@ function is_wp_error( $value ) {
 	return false;
 }
 
+function is_user_logged_in() {
+	return false;
+}
+
+function wp_unslash( $value ) {
+	return $value;
+}
+
+function wp_salt( $scheme = 'auth' ) {
+	unset( $scheme );
+	return 'frontend-agent-chat-smoke-salt';
+}
+
 require_once dirname( __DIR__ ) . '/inc/config.php';
 
 $failures = array();
@@ -106,6 +122,18 @@ frontend_agent_chat_smoke_assert_equals( true, frontend_agent_chat_user_can_see(
 
 $GLOBALS['frontend_agent_chat_smoke_allowed'] = false;
 frontend_agent_chat_smoke_assert_equals( false, frontend_agent_chat_user_can_see( $agents[0] ), 'visibility fails closed when Agents API denies the current principal', $failures, $passes );
+
+$_COOKIE[ FRONTEND_AGENT_CHAT_BROWSER_COOKIE ] = str_repeat( 'a', 64 );
+$GLOBALS['frontend_agent_chat_smoke_allowed']  = true;
+$list_input                                    = frontend_agent_chat_add_browser_principal_input( array( 'agent' => 'demo-agent' ) );
+frontend_agent_chat_smoke_assert_equals( true, frontend_agent_chat_allow_browser_conversation_sessions( false, $list_input ), 'browser principal may list its own conversation sessions', $failures, $passes );
+
+$tampered_input                                    = $list_input;
+$tampered_input['transcript_owner']['key']         = 'browser:tampered';
+frontend_agent_chat_smoke_assert_equals( false, frontend_agent_chat_allow_browser_conversation_sessions( false, $tampered_input ), 'browser principal cannot list another browser owner', $failures, $passes );
+
+$GLOBALS['frontend_agent_chat_smoke_allowed'] = false;
+frontend_agent_chat_smoke_assert_equals( false, frontend_agent_chat_allow_browser_conversation_sessions( false, $list_input ), 'browser session ability permission still requires agent access', $failures, $passes );
 
 $GLOBALS['frontend_agent_chat_smoke_agents'] = array();
 frontend_agent_chat_smoke_assert_equals( array(), frontend_agent_chat_list_accessible_agents(), 'no accessible principal grants means no agents', $failures, $passes );
