@@ -302,6 +302,51 @@ function frontend_agent_chat_add_browser_principal_input( array $input ): array 
 }
 
 /**
+ * Allow anonymous browser principals to use their own chat-session store.
+ *
+ * Agents API's generic session abilities default to logged-in users. The
+ * frontend widget scopes anonymous sessions to a signed browser principal, so
+ * allow only inputs whose owner fields match the current browser cookie and an
+ * agent the current visitor may see.
+ *
+ * @param bool  $allowed Existing permission decision.
+ * @param array $input   Ability input.
+ * @return bool Whether the ability may run.
+ */
+function frontend_agent_chat_allow_browser_conversation_sessions( bool $allowed, array $input ): bool {
+	if ( $allowed || is_user_logged_in() ) {
+		return $allowed;
+	}
+
+	$principal = frontend_agent_chat_get_browser_principal();
+	if ( ! $principal ) {
+		return false;
+	}
+
+	$input_principal = is_array( $input['principal'] ?? null ) ? $input['principal'] : array();
+	$transcript_owner = is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : array();
+	if (
+		'browser' !== (string) ( $input_principal['owner_type'] ?? '' ) ||
+		$principal['id'] !== (string) ( $input_principal['owner_key'] ?? '' ) ||
+		'browser' !== (string) ( $transcript_owner['type'] ?? '' ) ||
+		$principal['id'] !== (string) ( $transcript_owner['key'] ?? '' )
+	) {
+		return false;
+	}
+
+	$agent_slug = sanitize_title( (string) ( $input['agent'] ?? $input_principal['effective_agent_id'] ?? '' ) );
+	if ( '' === $agent_slug ) {
+		return false;
+	}
+
+	return frontend_agent_chat_user_can_see( frontend_agent_chat_resolve_agent( $agent_slug ) );
+}
+
+if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'agents_conversation_sessions_permission', 'frontend_agent_chat_allow_browser_conversation_sessions', 10, 2 );
+}
+
+/**
  * Normalize an Agents API descriptor for frontend chat use.
  *
  * @param array $agent Raw agent descriptor.
