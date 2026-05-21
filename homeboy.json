@@ -1,7 +1,7 @@
 {
   "id": "frontend-agent-chat",
   "changelog_target": "docs/CHANGELOG.md",
-  "remote_path": "../wp-content/plugins/frontend-agent-chat",
+  "remote_path": "wp-content/plugins/frontend-agent-chat",
   "extensions": {
     "wordpress": {}
   },
