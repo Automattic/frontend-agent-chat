@@ -323,13 +323,13 @@ function frontend_agent_chat_allow_browser_conversation_sessions( bool $allowed,
 		return false;
 	}
 
-	$input_principal = is_array( $input['principal'] ?? null ) ? $input['principal'] : array();
+	$input_principal  = is_array( $input['principal'] ?? null ) ? $input['principal'] : array();
 	$transcript_owner = is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : array();
 	if (
 		'browser' !== (string) ( $input_principal['owner_type'] ?? '' ) ||
-		$principal['id'] !== (string) ( $input_principal['owner_key'] ?? '' ) ||
+		(string) ( $input_principal['owner_key'] ?? '' ) !== $principal['id'] ||
 		'browser' !== (string) ( $transcript_owner['type'] ?? '' ) ||
-		$principal['id'] !== (string) ( $transcript_owner['key'] ?? '' )
+		(string) ( $transcript_owner['key'] ?? '' ) !== $principal['id']
 	) {
 		return false;
 	}
