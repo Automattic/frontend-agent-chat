@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.6] - 2026-05-21
+
+### Fixed
+- omit icon slot entirely when fab_icon is empty
+
 ## [0.8.5] - 2026-05-21
 
 ### Fixed
