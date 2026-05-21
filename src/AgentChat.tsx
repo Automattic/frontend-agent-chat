@@ -377,7 +377,8 @@ export default function AgentChat( {
 					activeAgentName
 				),
 			},
-			createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, fabIcon ),
+			'' !== fabIcon &&
+				createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, fabIcon ),
 			createElement( 'span', { className: 'frontend-agent-chat__fab-label' }, fabLabel ),
 			unreadCount > 0 &&
 				createElement(
