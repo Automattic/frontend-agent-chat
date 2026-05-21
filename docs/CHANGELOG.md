@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.5] - 2026-05-21
+
+### Fixed
+- satisfy WordPress Yoda condition rule in browser session checks
+- remote_path should be relative to wp-root, not workspace
+- allow browser chat session listing
+- offset expanded chat below admin bar
+
 ## [0.8.4] - 2026-05-19
 
 ### Fixed
