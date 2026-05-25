@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.7] - 2026-05-25
+
+### Fixed
+- preserve multimodal content + attachments on session reload
+
 ## [0.8.6] - 2026-05-21
 
 ### Fixed
