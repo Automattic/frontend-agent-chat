@@ -597,8 +597,14 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
 /**
  * Extract chat messages from a session or runtime result.
  *
+ * Normalizes both classic single-string content and multimodal content
+ * (an array of text/image parts produced by user image uploads) into the
+ * @extrachill/chat wire shape: `content` is always a plain string, and
+ * media is surfaced separately via `metadata.attachments` so the frontend
+ * normalizer can render image previews on session reload.
+ *
  * @param array $source Session or runtime result.
- * @return array<int,array{role:string,content:string}>
+ * @return array<int,array{role:string,content:string,metadata?:array}>
  */
 function frontend_agent_chat_session_messages( array $source ): array {
 	$messages = array();
@@ -616,13 +622,57 @@ function frontend_agent_chat_session_messages( array $source ): array {
 			continue;
 		}
 
-		$messages[] = array(
+		$normalized = array(
 			'role'    => $role,
-			'content' => (string) $message['content'],
+			'content' => frontend_agent_chat_flatten_message_content( $message['content'] ),
 		);
+
+		// Pass metadata through so the frontend normalizer can surface
+		// attachments (user image uploads, tool-produced media) on session
+		// reload. Without this, multimodal messages would render text-only.
+		if ( isset( $message['metadata'] ) && is_array( $message['metadata'] ) ) {
+			$normalized['metadata'] = $message['metadata'];
+		}
+
+		$messages[] = $normalized;
 	}
 
 	return $messages;
+}
+
+/**
+ * Flatten a message content payload into a plain string for the wire.
+ *
+ * Multimodal messages store content as an array of `{type, text}` and
+ * `{type, image_url}` parts (the canonical agents-api.message v1 shape).
+ * Concatenate the text parts; image parts are surfaced separately via
+ * `metadata.attachments` and don't need to appear in `content`.
+ *
+ * @param mixed $content Raw content (string or array of parts).
+ * @return string
+ */
+function frontend_agent_chat_flatten_message_content( $content ): string {
+	if ( is_string( $content ) ) {
+		return $content;
+	}
+
+	if ( ! is_array( $content ) ) {
+		return '';
+	}
+
+	$texts = array();
+	foreach ( $content as $part ) {
+		if ( ! is_array( $part ) ) {
+			continue;
+		}
+
+		$type = (string) ( $part['type'] ?? '' );
+		if ( 'text' === $type && isset( $part['text'] ) && is_string( $part['text'] ) ) {
+			$texts[] = $part['text'];
+		}
+	}
+
+	return implode( "\n\n", $texts );
 }
 
 /**
