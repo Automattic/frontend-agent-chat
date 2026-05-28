@@ -20,10 +20,11 @@
 import {
 	Chat,
 	DiffCard,
+	QuestionCard,
 	useClientContextMetadata,
 	parseCanonicalDiffFromToolGroup,
 } from '@extrachill/chat';
-import type { ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn } from '@extrachill/chat';
+import type { ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
 
 /**
@@ -208,6 +209,83 @@ function renderDiffCard( group: ToolGroup ): ReactNode {
 		diff,
 		onAccept: ( actionId: string ) => resolvePendingAction( actionId, 'accepted' ),
 		onReject: ( actionId: string ) => resolvePendingAction( actionId, 'rejected' ),
+	} );
+}
+
+interface QuestionPayload {
+	question?: string;
+	choices?: QuestionChoice[];
+	allow_freeform?: boolean;
+	freeform_label?: string;
+	freeform_placeholder?: string;
+}
+
+function parseJsonObject( value: string ): Record< string, unknown > | null {
+	try {
+		const parsed = JSON.parse( value );
+		return parsed && typeof parsed === 'object' && ! Array.isArray( parsed )
+			? parsed as Record< string, unknown >
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+function normalizeQuestionChoice( value: unknown ): QuestionChoice | null {
+	if ( ! value || typeof value !== 'object' || Array.isArray( value ) ) {
+		return null;
+	}
+
+	const choice = value as Record< string, unknown >;
+	const label = typeof choice.label === 'string' ? choice.label.trim() : '';
+	if ( ! label ) {
+		return null;
+	}
+
+	return {
+		label,
+		message: typeof choice.message === 'string' ? choice.message : undefined,
+		description: typeof choice.description === 'string' ? choice.description : undefined,
+	};
+}
+
+function questionPayloadFromToolGroup( group: ToolGroup ): QuestionPayload | null {
+	const result = group.resultMessage ? parseJsonObject( group.resultMessage.content ) : null;
+	const source = result && typeof result.result === 'object' && ! Array.isArray( result.result )
+		? result.result as Record< string, unknown >
+		: result ?? group.parameters;
+	const question = typeof source.question === 'string' ? source.question.trim() : '';
+	if ( ! question ) {
+		return null;
+	}
+
+	const choices = Array.isArray( source.choices )
+		? source.choices.map( normalizeQuestionChoice ).filter( ( choice ): choice is QuestionChoice => !! choice )
+		: [];
+
+	return {
+		question,
+		choices,
+		allow_freeform: source.allow_freeform !== false,
+		freeform_label: typeof source.freeform_label === 'string' ? source.freeform_label : undefined,
+		freeform_placeholder: typeof source.freeform_placeholder === 'string' ? source.freeform_placeholder : undefined,
+	};
+}
+
+function renderQuestionCard( group: ToolGroup, context: ToolRendererContext ): ReactNode {
+	const payload = questionPayloadFromToolGroup( group );
+	if ( ! payload ) {
+		return null;
+	}
+
+	return createElement( QuestionCard, {
+		question: payload.question ?? '',
+		choices: payload.choices,
+		allowFreeform: payload.allow_freeform,
+		freeformLabel: payload.freeform_label,
+		freeformPlaceholder: payload.freeform_placeholder,
+		disabled: context.isLoading,
+		onSubmitAnswer: context.sendMessage,
 	} );
 }
 
@@ -398,6 +476,7 @@ export default function AgentChat( {
 			edit_post_blocks: renderDiffCard,
 			replace_post_blocks: renderDiffCard,
 			insert_content: renderDiffCard,
+			studio_web_propose_questions: renderQuestionCard,
 		} ),
 		[]
 	);

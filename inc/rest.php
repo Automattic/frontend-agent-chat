@@ -614,6 +614,10 @@ function frontend_agent_chat_session_messages( array $source ): array {
 		}
 
 		if ( in_array( (string) ( $message['type'] ?? '' ), array( 'tool_call', 'tool_result' ), true ) ) {
+			$tool_message = frontend_agent_chat_tool_message( $message );
+			if ( null !== $tool_message ) {
+				$messages[] = $tool_message;
+			}
 			continue;
 		}
 
@@ -638,6 +642,46 @@ function frontend_agent_chat_session_messages( array $source ): array {
 	}
 
 	return $messages;
+}
+
+/**
+ * Normalize a canonical tool envelope into the chat package wire shape.
+ *
+ * @param array $message Canonical message envelope.
+ * @return array{role:string,content:string,metadata:array}|null Normalized message.
+ */
+function frontend_agent_chat_tool_message( array $message ): ?array {
+	$type = (string) ( $message['type'] ?? '' );
+	if ( ! in_array( $type, array( 'tool_call', 'tool_result' ), true ) ) {
+		return null;
+	}
+
+	$payload   = is_array( $message['payload'] ?? null ) ? $message['payload'] : array();
+	$metadata  = is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array();
+	$tool_name = (string) ( $payload['tool_name'] ?? $metadata['tool_name'] ?? '' );
+	if ( '' === $tool_name ) {
+		return null;
+	}
+
+	$metadata = array_merge(
+		$metadata,
+		array(
+			'type'       => $type,
+			'tool_name'  => $tool_name,
+			'parameters' => is_array( $payload['parameters'] ?? null ) ? $payload['parameters'] : array(),
+			'tool_data'  => $payload,
+		)
+	);
+
+	if ( 'tool_result' === $type ) {
+		$metadata['success'] = (bool) ( $payload['success'] ?? $metadata['success'] ?? false );
+	}
+
+	return array(
+		'role'     => 'tool_call' === $type ? 'assistant' : 'user',
+		'content'  => frontend_agent_chat_flatten_message_content( $message['content'] ?? '' ),
+		'metadata' => $metadata,
+	);
 }
 
 /**
