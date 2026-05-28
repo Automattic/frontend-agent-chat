@@ -23,7 +23,7 @@ import {
 	useClientContextMetadata,
 	parseCanonicalDiffFromToolGroup,
 } from '@extrachill/chat';
-import type { ToolGroup, DiffData, FetchFn, MediaUploadFn } from '@extrachill/chat';
+import type { ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
 
 /**
@@ -59,6 +59,7 @@ interface AgentChatProps {
 		actionLabel?: string;
 		actionUrl?: string;
 	};
+	messageSuggestions?: ChatMessageSuggestion[];
 }
 
 interface BootstrapResponse {
@@ -271,6 +272,7 @@ export default function AgentChat( {
 	isLoggedIn = false,
 	loadingMessages = true,
 	persistenceCta,
+	messageSuggestions,
 }: AgentChatProps ) {
 	const isInline = layout === 'inline';
 	const [ isOpen, setIsOpen ] = useState( isInline );
@@ -532,6 +534,8 @@ export default function AgentChat( {
 						createElement( 'h3', null, activeAgentName ),
 						createElement( 'p', null, activeAgentDescription )
 					),
+					messageSuggestions,
+					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,
 					processingLabel: ( turnCount: number ) =>
