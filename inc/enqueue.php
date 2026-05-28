@@ -108,6 +108,8 @@ function frontend_agent_chat_enqueue() {
 		'agentDescription'  => (string) ( $agent['agent_description'] ?? $agent['description'] ?? $config['description'] ),
 		'fabLabel'          => sanitize_text_field( (string) ( $config['fab_label'] ?? __( 'Agent Chat', 'frontend-agent-chat' ) ) ),
 		'fabIcon'           => sanitize_text_field( (string) ( $config['fab_icon'] ?? 'AI' ) ),
+		'fabIconPath'       => frontend_agent_chat_sanitize_svg_path( $config['fab_icon_path'] ?? '' ),
+		'fabIconViewBox'    => frontend_agent_chat_sanitize_svg_view_box( $config['fab_icon_view_box'] ?? '0 0 24 24' ),
 		'expandIconPath'    => frontend_agent_chat_sanitize_svg_path( $config['expand_icon_path'] ?? '' ),
 		'collapseIconPath'  => frontend_agent_chat_sanitize_svg_path( $config['collapse_icon_path'] ?? '' ),
 		'expandIconViewBox' => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),

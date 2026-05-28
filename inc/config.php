@@ -21,6 +21,8 @@ function frontend_agent_chat_get_config(): array {
 		'enabled'              => false,
 		'fab_label'            => __( 'Agent Chat', 'frontend-agent-chat' ),
 		'fab_icon'             => 'AI',
+		'fab_icon_path'        => '',
+		'fab_icon_view_box'    => '0 0 24 24',
 		'expand_icon_path'     => '',
 		'collapse_icon_path'   => '',
 		'expand_icon_view_box' => '0 0 24 24',

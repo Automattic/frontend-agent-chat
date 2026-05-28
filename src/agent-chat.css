@@ -43,6 +43,11 @@
 	line-height: 1;
 }
 
+.frontend-agent-chat__fab-svg {
+	display: block;
+	flex: 0 0 auto;
+}
+
 .frontend-agent-chat__fab-label {
 	display: inline-flex;
 	line-height: 1;
