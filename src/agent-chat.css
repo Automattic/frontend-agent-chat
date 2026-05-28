@@ -11,6 +11,15 @@
 	pointer-events: none;
 }
 
+.frontend-agent-chat.is-inline {
+	position: relative;
+	z-index: auto;
+	inset: auto;
+	width: 100%;
+	height: 100%;
+	pointer-events: auto;
+}
+
 .frontend-agent-chat__fab {
 	position: fixed;
 	z-index: 9999;
@@ -134,6 +143,22 @@
 .frontend-agent-chat__drawer:not(.is-open) {
 	visibility: hidden;
 	transition: transform 0.25s ease, visibility 0s 0.25s;
+}
+
+.frontend-agent-chat__drawer.is-inline {
+	position: relative;
+	z-index: auto;
+	top: auto;
+	right: auto;
+	bottom: auto;
+	width: 100%;
+	max-width: none;
+	height: 100%;
+	border-left: none;
+	box-shadow: none;
+	transform: none;
+	transition: none;
+	visibility: visible;
 }
 
 .frontend-agent-chat__header {
