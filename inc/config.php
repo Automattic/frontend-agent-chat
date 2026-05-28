@@ -87,7 +87,18 @@ function frontend_agent_chat_list_accessible_agents(): array {
 		$normalized[] = $agent;
 	}
 
-	return $normalized;
+	/**
+	 * Filter the agents exposed in the frontend chat selector.
+	 *
+	 * Domain plugins can add bundled/public agents when they own access policy
+	 * outside a persistent Agents API access store.
+	 *
+	 * @param array<int,array{agent_slug:string,agent_name:string,agent_description:string,meta:array}> $normalized   Accessible agents.
+	 * @param string                                                                                $minimum_role Minimum requested access role.
+	 */
+	$filtered = apply_filters( 'frontend_agent_chat_accessible_agents', $normalized, $minimum_role );
+
+	return is_array( $filtered ) ? array_values( $filtered ) : $normalized;
 }
 
 /**
@@ -382,7 +393,16 @@ function frontend_agent_chat_can_access_agent( string $agent_slug, string $minim
 		)
 	);
 
-	return ! is_wp_error( $result ) && is_array( $result ) && ! empty( $result['allowed'] );
+	$allowed = ! is_wp_error( $result ) && is_array( $result ) && ! empty( $result['allowed'] );
+
+	/**
+	 * Filter frontend chat access for a resolved agent.
+	 *
+	 * @param bool   $allowed      Access decision from Agents API.
+	 * @param string $agent_slug   Agent slug/id.
+	 * @param string $minimum_role Minimum requested access role.
+	 */
+	return (bool) apply_filters( 'frontend_agent_chat_can_access_agent', $allowed, $agent_slug, $minimum_role );
 }
 
 /**
