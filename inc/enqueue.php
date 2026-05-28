@@ -113,6 +113,7 @@ function frontend_agent_chat_enqueue() {
 		'expandIconPath'    => frontend_agent_chat_sanitize_svg_path( $config['expand_icon_path'] ?? '' ),
 		'collapseIconPath'  => frontend_agent_chat_sanitize_svg_path( $config['collapse_icon_path'] ?? '' ),
 		'expandIconViewBox' => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),
+		'layout'            => 'inline' === ( $config['layout'] ?? '' ) ? 'inline' : 'floating',
 		'isLoggedIn'        => is_user_logged_in(),
 	);
 

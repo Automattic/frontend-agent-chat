@@ -47,6 +47,7 @@ interface AgentChatProps {
 	expandIconPath?: string;
 	collapseIconPath?: string;
 	expandIconViewBox?: string;
+	layout?: 'floating' | 'inline';
 	isLoggedIn?: boolean;
 	loadingMessages?: boolean | {
 		mode?: 'default' | 'extend' | 'override';
@@ -258,11 +259,13 @@ export default function AgentChat( {
 	expandIconPath,
 	collapseIconPath,
 	expandIconViewBox = '0 0 24 24',
+	layout = 'floating',
 	isLoggedIn = false,
 	loadingMessages = true,
 	persistenceCta,
 }: AgentChatProps ) {
-	const [ isOpen, setIsOpen ] = useState( false );
+	const isInline = layout === 'inline';
+	const [ isOpen, setIsOpen ] = useState( isInline );
 	const [ isExpanded, setIsExpanded ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] = useState( isLoggedIn );
@@ -284,15 +287,26 @@ export default function AgentChat( {
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {
+		if ( isInline ) {
+			return;
+		}
+
 		setIsOpen( false );
 		setIsExpanded( false );
-	}, [] );
+	}, [ isInline ] );
 	const toggleExpanded = useCallback( () => setIsExpanded( ( expanded ) => ! expanded ), [] );
 	const switchAgent = useCallback( ( event: ChangeEvent< HTMLSelectElement > ) => {
 		const nextAgentSlug = event.target.value;
 		setSelectedAgentSlug( nextAgentSlug );
 		persistActiveAgent( nextAgentSlug );
 	}, [] );
+
+	useEffect( () => {
+		if ( isInline ) {
+			setIsOpen( true );
+			setIsExpanded( false );
+		}
+	}, [ isInline ] );
 
 	useEffect( () => {
 		if ( isLoggedIn ) {
@@ -354,7 +368,7 @@ export default function AgentChat( {
 	// Escape exits expanded mode first, then closes the drawer.
 	useEffect( () => {
 		function handleKeyDown( e: KeyboardEvent ) {
-			if ( e.key !== 'Escape' || ! isOpen ) {
+			if ( isInline || e.key !== 'Escape' || ! isOpen ) {
 				return;
 			}
 
@@ -367,7 +381,7 @@ export default function AgentChat( {
 		}
 		document.addEventListener( 'keydown', handleKeyDown );
 		return () => document.removeEventListener( 'keydown', handleKeyDown );
-	}, [ isExpanded, isOpen ] );
+	}, [ isExpanded, isInline, isOpen ] );
 
 	const toolRenderers = useMemo(
 		() => ( {
@@ -389,8 +403,8 @@ export default function AgentChat( {
 
 	return createElement(
 		'div',
-		{ className: 'frontend-agent-chat' },
-		createElement(
+		{ className: `frontend-agent-chat is-${ layout }` },
+		! isInline && createElement(
 			'button',
 			{
 				type: 'button',
@@ -414,13 +428,13 @@ export default function AgentChat( {
 		createElement(
 			'div',
 			{
-				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }${ isExpanded ? ' is-expanded' : '' }`,
+				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }${ isExpanded ? ' is-expanded' : '' }${ isInline ? ' is-inline' : '' }`,
 				'aria-hidden': ! isOpen,
 			},
 			createElement(
 				'div',
 				{ className: 'frontend-agent-chat__header' },
-				createElement(
+				! isInline && createElement(
 					'div',
 					{ className: 'frontend-agent-chat__agent' },
 					agents.length > 1 ? createElement(

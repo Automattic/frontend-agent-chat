@@ -27,6 +27,7 @@ function frontend_agent_chat_get_config(): array {
 		'collapse_icon_path'   => '',
 		'expand_icon_view_box' => '0 0 24 24',
 		'loading_messages'     => true,
+		'layout'               => 'floating',
 	);
 
 	$saved = get_option( 'frontend_agent_chat_config', array() );
