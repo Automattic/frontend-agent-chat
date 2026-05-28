@@ -399,9 +399,13 @@ export default function AgentChat( {
 		} ),
 		[]
 	);
+	const hasPersistenceCta = !! (
+		persistenceCta?.message ||
+		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
+	);
 	const persistenceMessage = browserBootstrapFailed
 		? __( 'Chat works, but this browser is blocking secure chat-history cookies.', 'frontend-agent-chat' )
-		: ( persistenceCta?.message || __( 'This browser can keep chat history with a secure cookie.', 'frontend-agent-chat' ) );
+		: persistenceCta?.message;
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
 		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
@@ -493,7 +497,7 @@ export default function AgentChat( {
 			createElement(
 				'div',
 				{ className: 'frontend-agent-chat__body' },
-				! isLoggedIn && createElement(
+				! isLoggedIn && ( browserBootstrapFailed || hasPersistenceCta ) && createElement(
 					'div',
 					{ className: `frontend-agent-chat__persistence${ browserBootstrapFailed ? ' has-warning' : '' }` },
 					persistenceMessage,
