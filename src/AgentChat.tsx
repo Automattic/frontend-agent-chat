@@ -164,6 +164,14 @@ function persistActiveAgent( agentSlug: string ): void {
 	} );
 }
 
+function dispatchResponseMetadata( metadata: Record< string, unknown > ): void {
+	window.dispatchEvent(
+		new CustomEvent( 'frontend-agent-chat:response-metadata', {
+			detail: { metadata },
+		} )
+	);
+}
+
 /**
  * Upload a file to the WordPress Media Library.
  *
@@ -511,6 +519,7 @@ export default function AgentChat( {
 						activeAgentName
 					),
 					metadata,
+					onResponseMetadata: dispatchResponseMetadata,
 					isVisible: isOpen,
 					onUnreadChange: setUnreadCount,
 					emptyState: createElement(
