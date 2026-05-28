@@ -42,6 +42,8 @@ interface AgentChatProps {
 	agentDescription: string;
 	fabLabel?: string;
 	fabIcon?: string;
+	fabIconPath?: string;
+	fabIconViewBox?: string;
 	expandIconPath?: string;
 	collapseIconPath?: string;
 	expandIconViewBox?: string;
@@ -221,6 +223,27 @@ function renderExpandIcon( path: string, viewBox: string ): ReactNode {
 	);
 }
 
+function renderFabIcon( icon: string, path: string, viewBox: string ): ReactNode {
+	if ( path ) {
+		return createElement(
+			'svg',
+			{
+				className: 'frontend-agent-chat__fab-svg',
+				viewBox,
+				width: 22,
+				height: 22,
+				'aria-hidden': true,
+				focusable: false,
+			},
+			createElement( 'path', { d: path, fill: 'currentColor' } )
+		);
+	}
+
+	return '' !== icon
+		? createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, icon )
+		: null;
+}
+
 export default function AgentChat( {
 	agentSlug,
 	basePath,
@@ -230,6 +253,8 @@ export default function AgentChat( {
 	agentDescription,
 	fabLabel = __( 'Agent Chat', 'frontend-agent-chat' ),
 	fabIcon = 'AI',
+	fabIconPath = '',
+	fabIconViewBox = '0 0 24 24',
 	expandIconPath,
 	collapseIconPath,
 	expandIconViewBox = '0 0 24 24',
@@ -377,8 +402,7 @@ export default function AgentChat( {
 					activeAgentName
 				),
 			},
-			'' !== fabIcon &&
-				createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, fabIcon ),
+			renderFabIcon( fabIcon, fabIconPath, fabIconViewBox ),
 			createElement( 'span', { className: 'frontend-agent-chat__fab-label' }, fabLabel ),
 			unreadCount > 0 &&
 				createElement(
