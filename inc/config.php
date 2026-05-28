@@ -317,6 +317,54 @@ function frontend_agent_chat_add_browser_principal_input( array $input ): array 
 }
 
 /**
+ * Resolve the current anonymous browser cookie as an Agents API principal.
+ *
+ * REST conversation-session abilities intentionally ignore caller-declared
+ * principal arrays, so the browser principal must be resolved from the current
+ * request before the generic session store can list, read, or delete sessions.
+ *
+ * @param mixed $resolved        Existing resolved principal.
+ * @param array $request_context Agents API principal request context.
+ * @return mixed Resolved principal array or existing principal.
+ */
+function frontend_agent_chat_resolve_browser_execution_principal( $resolved, array $request_context ) {
+	if ( null !== $resolved || is_user_logged_in() ) {
+		return $resolved;
+	}
+
+	if ( 'rest' !== (string) ( $request_context['request_context'] ?? '' ) ) {
+		return $resolved;
+	}
+
+	$principal = frontend_agent_chat_get_browser_principal();
+	if ( ! $principal ) {
+		return $resolved;
+	}
+
+	$agent_slug = sanitize_title( (string) ( $request_context['agent'] ?? $request_context['agent_slug'] ?? $request_context['effective_agent_id'] ?? '' ) );
+	if ( '' === $agent_slug ) {
+		$agent_slug = sanitize_title( (string) ( frontend_agent_chat_get_config()['agent_slug'] ?? '' ) );
+	}
+	if ( '' === $agent_slug ) {
+		$agent_slug = 'frontend-agent-chat';
+	}
+
+	return array(
+		'acting_user_id'     => 0,
+		'effective_agent_id' => $agent_slug,
+		'auth_source'        => 'audience',
+		'request_context'    => 'rest',
+		'client_id'          => 'frontend-agent-chat',
+		'audience_id'        => 'browser',
+		'audience_claims'    => array(
+			'browser_principal_id' => $principal['id'],
+		),
+		'owner_type'         => 'browser',
+		'owner_key'          => $principal['id'],
+	);
+}
+
+/**
  * Allow anonymous browser principals to use their own chat-session store.
  *
  * Agents API's generic session abilities default to logged-in users. The
@@ -358,6 +406,7 @@ function frontend_agent_chat_allow_browser_conversation_sessions( bool $allowed,
 }
 
 if ( function_exists( 'add_filter' ) ) {
+	add_filter( 'agents_api_execution_principal', 'frontend_agent_chat_resolve_browser_execution_principal', 10, 2 );
 	add_filter( 'agents_conversation_sessions_permission', 'frontend_agent_chat_allow_browser_conversation_sessions', 10, 2 );
 }
 
