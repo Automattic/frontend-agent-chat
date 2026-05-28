@@ -666,10 +666,11 @@ function frontend_agent_chat_tool_message( array $message ): ?array {
 	$metadata = array_merge(
 		$metadata,
 		array(
-			'type'       => $type,
-			'tool_name'  => $tool_name,
-			'parameters' => is_array( $payload['parameters'] ?? null ) ? $payload['parameters'] : array(),
-			'tool_data'  => $payload,
+			'type'         => $type,
+			'tool_name'    => $tool_name,
+			'tool_call_id' => (string) ( $payload['tool_call_id'] ?? $metadata['tool_call_id'] ?? '' ),
+			'parameters'   => is_array( $payload['parameters'] ?? null ) ? $payload['parameters'] : array(),
+			'tool_data'    => $payload,
 		)
 	);
 
