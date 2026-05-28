@@ -13,6 +13,7 @@
  */
 import '@extrachill/chat/css';
 import type { ReactElement } from 'react';
+import type { ChatMessageSuggestion } from '@extrachill/chat';
 
 /**
  * WordPress dependencies
@@ -53,6 +54,7 @@ declare global {
 				actionLabel?: string;
 				actionUrl?: string;
 			};
+			messageSuggestions?: ChatMessageSuggestion[];
 		};
 	}
 }
@@ -101,6 +103,7 @@ function init(): void {
 			isLoggedIn: config.isLoggedIn ?? false,
 			loadingMessages: config.loadingMessages ?? true,
 			persistenceCta: config.persistenceCta,
+			messageSuggestions: config.messageSuggestions,
 		} )
 	);
 }

@@ -45,6 +45,46 @@ function frontend_agent_chat_sanitize_svg_view_box( $view_box ): string {
 }
 
 /**
+ * Sanitize message suggestions for the frontend chat UI.
+ *
+ * @param mixed $suggestions Raw suggestion config.
+ * @return array<int,array{label:string,message?:string,description?:string}> Sanitized suggestions.
+ */
+function frontend_agent_chat_sanitize_message_suggestions( $suggestions ): array {
+	if ( ! is_array( $suggestions ) ) {
+		return array();
+	}
+
+	$sanitized = array();
+	foreach ( $suggestions as $suggestion ) {
+		if ( ! is_array( $suggestion ) ) {
+			continue;
+		}
+
+		$label = sanitize_text_field( (string) ( $suggestion['label'] ?? '' ) );
+		if ( '' === $label ) {
+			continue;
+		}
+
+		$item = array( 'label' => $label );
+
+		$message = sanitize_textarea_field( (string) ( $suggestion['message'] ?? '' ) );
+		if ( '' !== $message ) {
+			$item['message'] = $message;
+		}
+
+		$description = sanitize_text_field( (string) ( $suggestion['description'] ?? '' ) );
+		if ( '' !== $description ) {
+			$item['description'] = $description;
+		}
+
+		$sanitized[] = $item;
+	}
+
+	return $sanitized;
+}
+
+/**
  * Enqueue the frontend chat script and styles.
  *
  * Fires on wp_enqueue_scripts so the assets load on every frontend page.
@@ -123,7 +163,7 @@ function frontend_agent_chat_enqueue() {
 	 * Domain plugins can provide a product-specific sign-in or account-linking
 	 * action without coupling this generic widget to a concrete identity provider.
 	 * Return an array with `message`, `action_label`, and `action_url`, or an empty
-	 * array to show the generic browser-cookie persistence message.
+	 * array to hide this optional CTA slot.
 	 *
 	 * @param array $cta    CTA data.
 	 * @param array $config Frontend chat configuration.
@@ -141,6 +181,11 @@ function frontend_agent_chat_enqueue() {
 
 	if ( ! empty( $config['loading_messages'] ) ) {
 		$js_config['loadingMessages'] = $config['loading_messages'];
+	}
+
+	$message_suggestions = frontend_agent_chat_sanitize_message_suggestions( $config['message_suggestions'] ?? array() );
+	if ( ! empty( $message_suggestions ) ) {
+		$js_config['messageSuggestions'] = $message_suggestions;
 	}
 
 	wp_localize_script(
