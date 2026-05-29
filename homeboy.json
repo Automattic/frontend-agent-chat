@@ -1,7 +1,8 @@
 {
-  "id": "frontend-agent-chat",
-  "changelog_target": "docs/CHANGELOG.md",
-  "remote_path": "wp-content/plugins/frontend-agent-chat",
+	"id": "frontend-agent-chat",
+	"changelog_target": "docs/CHANGELOG.md",
+	"extract_command": "tmp=$(mktemp -d) && unzip -q {artifact} -d $tmp && cp -a $tmp/frontend-agent-chat/. . && rm -rf $tmp {artifact}",
+	"remote_path": "wp-content/plugins/frontend-agent-chat",
   "extensions": {
     "wordpress": {}
   },

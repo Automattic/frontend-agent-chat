@@ -334,6 +334,10 @@
 	background: var(--frontend-agent-chat-error-bg, #fef2f2);
 }
 
+.frontend-agent-chat__tool-card--generation.has-error {
+	box-shadow: 0 8px 24px rgba(127, 29, 29, 0.12);
+}
+
 .frontend-agent-chat__tool-card-title {
 	margin-bottom: 4px;
 	font-weight: 700;
@@ -344,6 +348,18 @@
 	color: var(--frontend-agent-chat-text-muted, #64748b);
 	font-size: 13px;
 	line-height: 1.45;
+}
+
+.frontend-agent-chat__tool-card-error {
+	margin: 8px 0 0;
+	padding: 8px 10px;
+	border-radius: 10px;
+	background: var(--frontend-agent-chat-error-detail-bg, rgba(127, 29, 29, 0.08));
+	color: var(--frontend-agent-chat-error-text, #991b1b);
+	font-family: var(--frontend-agent-chat-monospace-font-family, ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace);
+	font-size: 12px;
+	line-height: 1.45;
+	white-space: pre-wrap;
 }
 
 .frontend-agent-chat__empty {
