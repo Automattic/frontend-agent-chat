@@ -217,12 +217,13 @@ frontend_agent_chat_run_control_assert_equals( 'running', $run_response['data'][
 $cancel_response = frontend_agent_chat_rest_cancel_run( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_run_control_assert_equals( true, $cancel_response['data']['cancelled'] ?? false, 'cancel response is normalized', $failures, $passes );
 
-$queue_response = frontend_agent_chat_rest_queue_message( new WP_REST_Request( array( 'message' => 'next', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );
+$queue_response = frontend_agent_chat_rest_queue_message( new WP_REST_Request( array( 'message' => 'next', 'session_id' => 'session-1', 'run_id' => 'run-1', 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_run_control_assert_equals( 'queued-1', $queue_response['data']['queued_message_id'] ?? '', 'queue response is normalized', $failures, $passes );
 
 $last_call = end( $GLOBALS['frontend_agent_chat_run_control_calls'] );
 frontend_agent_chat_run_control_assert_equals( 'agents/queue-chat-message', $last_call[0] ?? '', 'queue route calls canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( 'browser', $last_call[1]['transcript_owner']['type'] ?? '', 'queue preserves browser owner', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( 'run-1', $last_call[1]['run_id'] ?? '', 'queue forwards active run id', $failures, $passes );
 
 $GLOBALS['frontend_agent_chat_run_control_abilities'] = array( 'agents/list-accessible-agents', 'agents/can-access-agent' );
 $capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );

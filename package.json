@@ -8,7 +8,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@extrachill/chat": "github:Extra-Chill/chat#fba7b09"
+		"@extrachill/chat": "github:Extra-Chill/chat#318014d44092174d7639f5d906c3bb6381ed6571"
 	},
 	"devDependencies": {
 		"@types/wordpress__block-editor": "^15.0.5",

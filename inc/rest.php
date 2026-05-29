@@ -494,6 +494,7 @@ function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
 	$queue_input = array(
 		'agent'          => $agent_slug,
 		'session_id'     => $session_id,
+		'run_id'         => sanitize_text_field( (string) $request->get_param( 'run_id' ) ),
 		'message'        => $message,
 		'attachments'    => is_array( $attachments ) ? $attachments : array(),
 		'client_context' => array(

@@ -24,7 +24,7 @@ import {
 	useClientContextMetadata,
 	parseCanonicalDiffFromToolGroup,
 } from '@extrachill/chat';
-import type { ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice } from '@extrachill/chat';
+import type { ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice, ChatRunCapabilities, CancelRunInput, QueueMessageInput, QueueMessageResult } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
 
 /**
@@ -61,6 +61,11 @@ interface AgentChatProps {
 		actionUrl?: string;
 	};
 	messageSuggestions?: ChatMessageSuggestion[];
+	capabilities?: {
+		chat_run_status?: boolean;
+		chat_run_cancel?: boolean;
+		chat_message_queue?: boolean;
+	};
 }
 
 interface BootstrapResponse {
@@ -70,6 +75,21 @@ interface BootstrapResponse {
 		browser_principal_ready?: boolean;
 		had_browser_principal?: boolean;
 		session_persistence_scope?: 'user' | 'browser';
+		capabilities?: AgentChatProps['capabilities'];
+	};
+}
+
+interface RunControlResponse {
+	success?: boolean;
+	data?: {
+		run_id?: string;
+		session_id?: string;
+		status?: string;
+		started_at?: string;
+		updated_at?: string;
+		metadata?: Record< string, unknown >;
+		queued_message_id?: string;
+		position?: number;
 	};
 }
 
@@ -152,6 +172,71 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 				: options.data,
 			headers: options.headers,
 		} );
+	};
+}
+
+function createRunCapabilities( capabilities?: AgentChatProps['capabilities'] ): ChatRunCapabilities {
+	return {
+		cancel: !! capabilities?.chat_run_cancel,
+		queue: !! capabilities?.chat_message_queue,
+	};
+}
+
+function getRunId( metadata: Record< string, unknown > ): string | null {
+	const runId = metadata.run_id ?? metadata.runId;
+	return typeof runId === 'string' && runId.trim() ? runId : null;
+}
+
+function createCancelRun( fetchFn: FetchFn, basePath: string ): ( input: CancelRunInput ) => Promise< void > {
+	return async ( input ) => {
+		await fetchFn( {
+			path: `${ basePath }/runs/${ encodeURIComponent( input.runId ) }/cancel`,
+			method: 'POST',
+			data: { session_id: input.sessionId },
+		} );
+	};
+}
+
+function normalizeQueueResult( response: RunControlResponse ): QueueMessageResult {
+	const data = response.data ?? {};
+	return {
+		queuedMessageId: data.queued_message_id,
+		runId: data.run_id,
+		sessionId: data.session_id,
+		status: data.status as QueueMessageResult['status'],
+		startedAt: data.started_at,
+		updatedAt: data.updated_at,
+		metadata: data.metadata,
+		position: data.position,
+	};
+}
+
+function createQueueMessage( fetchFn: FetchFn, uploadFn: MediaUploadFn, basePath: string ): ( input: QueueMessageInput ) => Promise< QueueMessageResult > {
+	return async ( input ) => {
+		const attachments = input.files?.length
+			? await Promise.all( input.files.map( async ( file ) => {
+				const uploaded = await uploadFn( file );
+				return {
+					filename: file.name,
+					mime_type: file.type,
+					url: uploaded.url,
+					media_id: uploaded.media_id,
+				};
+			} ) )
+			: [];
+
+		const response = await fetchFn( {
+			path: `${ basePath }/queue`,
+			method: 'POST',
+			data: {
+				session_id: input.sessionId,
+				run_id: input.runId,
+				message: input.content,
+				attachments,
+			},
+		} ) as RunControlResponse;
+
+		return normalizeQueueResult( response );
 	};
 }
 
@@ -366,6 +451,7 @@ export default function AgentChat( {
 	loadingMessages = true,
 	persistenceCta,
 	messageSuggestions,
+	capabilities,
 }: AgentChatProps ) {
 	const isInline = layout === 'inline';
 	const [ isOpen, setIsOpen ] = useState( isInline );
@@ -388,6 +474,9 @@ export default function AgentChat( {
 	const activeAgentName = selectedAgent?.name ?? agentName;
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
+	const runCapabilities = useMemo( () => createRunCapabilities( capabilities ), [ capabilities ] );
+	const cancelRun = useMemo( () => createCancelRun( agentFetch, basePath ), [ agentFetch, basePath ] );
+	const queueMessage = useMemo( () => createQueueMessage( agentFetch, wpMediaUpload, basePath ), [ agentFetch, basePath ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {
 		if ( isInline ) {
@@ -633,6 +722,11 @@ export default function AgentChat( {
 					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,
+					runCapabilities,
+					getRunId,
+					onCancelRun: cancelRun,
+					onQueueMessage: queueMessage,
+					cancelLabel: __( 'Stop', 'frontend-agent-chat' ),
 					processingLabel: ( turnCount: number ) =>
 						sprintf(
 							/* translators: %d: processing turn count. */
