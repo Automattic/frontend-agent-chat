@@ -289,6 +289,21 @@ function renderQuestionCard( group: ToolGroup, context: ToolRendererContext ): R
 	} );
 }
 
+function renderGenerationCard( group: ToolGroup ): ReactNode {
+	return createElement(
+		'div',
+		{ className: `frontend-agent-chat__tool-card frontend-agent-chat__tool-card--generation${ group.success === false ? ' has-error' : '' }` },
+		createElement( 'div', { className: 'frontend-agent-chat__tool-card-title' }, __( 'WordPress preview', 'frontend-agent-chat' ) ),
+		createElement(
+			'p',
+			{ className: 'frontend-agent-chat__tool-card-copy' },
+			group.success === false
+				? __( 'The preview could not be started. Try again with a shorter brief or adjust the request.', 'frontend-agent-chat' )
+				: __( 'Studio Web is preparing your WordPress preview from the captured site brief.', 'frontend-agent-chat' )
+		)
+	);
+}
+
 function renderExpandIcon( path: string, viewBox: string ): ReactNode {
 	return createElement(
 		'svg',
@@ -477,6 +492,7 @@ export default function AgentChat( {
 			replace_post_blocks: renderDiffCard,
 			insert_content: renderDiffCard,
 			studio_web_propose_questions: renderQuestionCard,
+			studio_web_start_generation: renderGenerationCard,
 		} ),
 		[]
 	);
