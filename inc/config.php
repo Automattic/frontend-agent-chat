@@ -465,15 +465,10 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 		$can_chat = frontend_agent_chat_user_can_see( frontend_agent_chat_resolve_agent( $agent_slug ) );
 	}
 
-	$result = $can_chat ? frontend_agent_chat_execute_ability(
-		'agents/chat-run-control-capabilities',
-		frontend_agent_chat_add_browser_principal_input( array( 'agent' => $agent_slug ) )
-	) : null;
-
 	$capabilities = array(
-		'chat_run_status'   => is_array( $result ) && ! empty( $result['chat_run_status'] ),
-		'chat_run_cancel'   => is_array( $result ) && ! empty( $result['chat_run_cancel'] ),
-		'chat_message_queue' => is_array( $result ) && ! empty( $result['chat_message_queue'] ),
+		'chat_run_status'   => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
+		'chat_run_cancel'   => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
+		'chat_message_queue' => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
 	);
 
 	/**

@@ -68,14 +68,6 @@ class FrontendAgentChatRunControlFakeAbility {
 			return array( 'allowed' => true );
 		}
 
-		if ( 'agents/chat-run-control-capabilities' === $this->name ) {
-			return array(
-				'chat_run_status'    => isset( $GLOBALS['frontend_agent_chat_run_control_handlers']['wp_agent_chat_run_status_handler'] ),
-				'chat_run_cancel'    => isset( $GLOBALS['frontend_agent_chat_run_control_handlers']['wp_agent_chat_run_cancel_handler'] ),
-				'chat_message_queue' => isset( $GLOBALS['frontend_agent_chat_run_control_handlers']['wp_agent_chat_message_queue_handler'] ),
-			);
-		}
-
 		if ( 'agents/get-chat-run' === $this->name ) {
 			return array(
 				'run_id'     => $input['run_id'],
@@ -207,46 +199,18 @@ $GLOBALS['frontend_agent_chat_run_control_agents'] = array(
 $GLOBALS['frontend_agent_chat_run_control_abilities'] = array(
 	'agents/list-accessible-agents',
 	'agents/can-access-agent',
-	'agents/chat-run-control-capabilities',
 	'agents/get-chat-run',
 	'agents/cancel-chat-run',
 	'agents/queue-chat-message',
 );
-$GLOBALS['frontend_agent_chat_run_control_handlers'] = array();
 
 $_COOKIE[ FRONTEND_AGENT_CHAT_BROWSER_COOKIE ] = str_repeat( 'b', 64 );
 
 $capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
-frontend_agent_chat_run_control_assert_equals( false, $capabilities['chat_run_status'], 'status capability requires runtime handler', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( false, $capabilities['chat_run_cancel'], 'cancel capability requires runtime handler', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( false, $capabilities['chat_message_queue'], 'queue capability requires runtime handler', $failures, $passes );
-
-$GLOBALS['frontend_agent_chat_run_control_handlers'] = array(
-	'wp_agent_chat_run_status_handler'    => static fn( array $input ) => array(
-		'run_id'     => $input['run_id'],
-		'session_id' => $input['session_id'],
-		'status'     => 'running',
-	),
-	'wp_agent_chat_run_cancel_handler'    => static fn( array $input ) => array(
-		'run_id'     => $input['run_id'],
-		'session_id' => $input['session_id'],
-		'status'     => 'cancelling',
-		'cancelled'  => true,
-	),
-	'wp_agent_chat_message_queue_handler' => static fn( array $input ) => array(
-		'run_id'            => 'run-next',
-		'session_id'        => $input['session_id'],
-		'status'            => 'queued',
-		'queued_message_id' => 'queued-1',
-	),
-);
-
-$capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
-frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_status'], 'status capability requires ability and handler', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_cancel'], 'cancel capability requires ability and handler', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_message_queue'], 'queue capability requires ability and handler', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( 'agents/chat-run-control-capabilities', $GLOBALS['frontend_agent_chat_run_control_calls'][2][0] ?? '', 'capability detection calls canonical probe ability', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( 'demo-agent', $GLOBALS['frontend_agent_chat_run_control_calls'][2][1]['agent'] ?? '', 'capability probe receives selected agent', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_status'], 'status capability requires canonical ability', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_cancel'], 'cancel capability requires canonical ability', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_message_queue'], 'queue capability requires canonical ability', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( 'agents/list-accessible-agents', $GLOBALS['frontend_agent_chat_run_control_calls'][0][0] ?? '', 'capability detection checks selected agent access', $failures, $passes );
 
 $run_response = frontend_agent_chat_rest_get_run( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_run_control_assert_equals( 'running', $run_response['data']['status'] ?? '', 'run status is normalized', $failures, $passes );
@@ -264,7 +228,7 @@ frontend_agent_chat_run_control_assert_equals( 'run-1', $last_call[1]['run_id'] 
 
 $GLOBALS['frontend_agent_chat_run_control_abilities'] = array( 'agents/list-accessible-agents', 'agents/can-access-agent' );
 $capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
-frontend_agent_chat_run_control_assert_equals( false, $capabilities['chat_run_status'], 'missing capability probe disables status capability', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( false, $capabilities['chat_run_status'], 'missing status ability disables status capability', $failures, $passes );
 
 if ( ! empty( $failures ) ) {
 	fwrite( STDERR, implode( "\n", $failures ) . "\n" );
