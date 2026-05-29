@@ -452,29 +452,6 @@ function frontend_agent_chat_has_ability( string $name ): bool {
 }
 
 /**
- * Check whether the selected chat runtime exposes a run-control handler.
- *
- * Agents API registers canonical run-control abilities globally, but each
- * runtime owns whether a specific agent can actually report status, cancel, or
- * queue. Capability detection must account for both layers so clients do not
- * expose controls that a selected agent cannot honor.
- *
- * @param string $handler_filter Runtime handler filter name.
- * @param string $agent_slug     Selected agent slug.
- * @return bool Whether a callable runtime handler is available.
- */
-function frontend_agent_chat_has_run_control_handler( string $handler_filter, string $agent_slug ): bool {
-	if ( '' === $agent_slug ) {
-		return false;
-	}
-
-	$input = array( 'agent' => $agent_slug );
-	$input = frontend_agent_chat_add_browser_principal_input( $input );
-
-	return is_callable( apply_filters( $handler_filter, null, $input ) );
-}
-
-/**
  * Detect run-control support for the current frontend chat principal.
  *
  * @param string $agent_slug Optional selected agent slug.
@@ -488,16 +465,15 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 		$can_chat = frontend_agent_chat_user_can_see( frontend_agent_chat_resolve_agent( $agent_slug ) );
 	}
 
+	$result = $can_chat ? frontend_agent_chat_execute_ability(
+		'agents/chat-run-control-capabilities',
+		frontend_agent_chat_add_browser_principal_input( array( 'agent' => $agent_slug ) )
+	) : null;
+
 	$capabilities = array(
-		'chat_run_status'   => $can_chat
-			&& frontend_agent_chat_has_ability( 'agents/get-chat-run' )
-			&& frontend_agent_chat_has_run_control_handler( 'wp_agent_chat_run_status_handler', $agent_slug ),
-		'chat_run_cancel'   => $can_chat
-			&& frontend_agent_chat_has_ability( 'agents/cancel-chat-run' )
-			&& frontend_agent_chat_has_run_control_handler( 'wp_agent_chat_run_cancel_handler', $agent_slug ),
-		'chat_message_queue' => $can_chat
-			&& frontend_agent_chat_has_ability( 'agents/queue-chat-message' )
-			&& frontend_agent_chat_has_run_control_handler( 'wp_agent_chat_message_queue_handler', $agent_slug ),
+		'chat_run_status'   => is_array( $result ) && ! empty( $result['chat_run_status'] ),
+		'chat_run_cancel'   => is_array( $result ) && ! empty( $result['chat_run_cancel'] ),
+		'chat_message_queue' => is_array( $result ) && ! empty( $result['chat_message_queue'] ),
 	);
 
 	/**
