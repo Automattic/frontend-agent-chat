@@ -458,7 +458,7 @@ function frontend_agent_chat_rest_cancel_run( WP_REST_Request $request ) {
 		return $result;
 	}
 
-	$data = frontend_agent_chat_normalize_run_control_result( is_array( $result ) ? $result : array(), $run_id, $session_id );
+	$data              = frontend_agent_chat_normalize_run_control_result( is_array( $result ) ? $result : array(), $run_id, $session_id );
 	$data['cancelled'] = (bool) ( is_array( $result ) && ( $result['cancelled'] ?? false ) );
 
 	return rest_ensure_response(
@@ -528,7 +528,7 @@ function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
 				'run_id'            => sanitize_text_field( (string) ( $result['run_id'] ?? '' ) ),
 				'position'          => (int) ( $result['position'] ?? 0 ),
 				'status'            => sanitize_key( (string) ( $result['status'] ?? 'queued' ) ),
-			)
+			),
 		)
 	);
 }

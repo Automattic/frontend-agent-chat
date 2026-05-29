@@ -100,6 +100,7 @@ function frontend_agent_chat_list_accessible_agents(): array {
 	 * @param array<int,array{agent_slug:string,agent_name:string,agent_description:string,meta:array}> $normalized   Accessible agents.
 	 * @param string                                                                                $minimum_role Minimum requested access role.
 	 */
+	/** @var mixed $filtered */
 	$filtered = apply_filters( 'frontend_agent_chat_accessible_agents', $normalized, $minimum_role );
 
 	return is_array( $filtered ) ? array_values( $filtered ) : $normalized;
@@ -474,8 +475,8 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 	}
 
 	$capabilities = array(
-		'chat_run_status'   => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
-		'chat_run_cancel'   => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
+		'chat_run_status'    => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
+		'chat_run_cancel'    => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
 		'chat_message_queue' => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
 	);
 
@@ -485,11 +486,12 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 	 * @param array  $capabilities Capability flags.
 	 * @param string $agent_slug    Selected agent slug, when known.
 	 */
+	/** @var mixed $filtered */
 	$filtered = apply_filters( 'frontend_agent_chat_run_control_capabilities', $capabilities, $agent_slug );
 
 	return is_array( $filtered ) ? array(
-		'chat_run_status'   => ! empty( $filtered['chat_run_status'] ),
-		'chat_run_cancel'   => ! empty( $filtered['chat_run_cancel'] ),
+		'chat_run_status'    => ! empty( $filtered['chat_run_status'] ),
+		'chat_run_cancel'    => ! empty( $filtered['chat_run_cancel'] ),
 		'chat_message_queue' => ! empty( $filtered['chat_message_queue'] ),
 	) : $capabilities;
 }
