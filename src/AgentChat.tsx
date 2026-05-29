@@ -503,6 +503,7 @@ export default function AgentChat( {
 	const persistenceMessage = browserBootstrapFailed
 		? __( 'Chat works, but this browser is blocking secure chat-history cookies.', 'frontend-agent-chat' )
 		: persistenceCta?.message;
+	const chatStorageReady = isLoggedIn || browserBootstrapReady;
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
 		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
@@ -607,12 +608,12 @@ export default function AgentChat( {
 						persistenceCta.actionLabel
 					)
 				),
-				activeAgentSlug && createElement( Chat, {
+				activeAgentSlug && chatStorageReady && createElement( Chat, {
 					key: activeAgentSlug,
 					basePath,
 					fetchFn: agentFetch,
 					showTools: true,
-					showSessions: isLoggedIn || browserBootstrapReady,
+					showSessions: true,
 					toolRenderers,
 					placeholder: sprintf(
 						/* translators: %s: agent name. */
