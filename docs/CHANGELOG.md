@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.1] - 2026-05-29
+
+### Fixed
+- satisfy frontend chat release gates
+- remove redundant question freeform input
+
 ## [0.9.0] - 2026-05-29
 
 ### Added
