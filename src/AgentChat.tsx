@@ -377,7 +377,7 @@ function renderQuestionCard( group: ToolGroup, context: ToolRendererContext ): R
 	return createElement( QuestionCard, {
 		question: payload.question ?? '',
 		choices: payload.choices,
-		allowFreeform: payload.allow_freeform,
+		allowFreeform: false,
 		freeformLabel: payload.freeform_label,
 		freeformPlaceholder: payload.freeform_placeholder,
 		disabled: context.isLoading,
