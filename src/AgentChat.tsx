@@ -24,7 +24,7 @@ import {
 	useClientContextMetadata,
 	parseCanonicalDiffFromToolGroup,
 } from '@extrachill/chat';
-import type { ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice, ChatRunCapabilities, CancelRunInput, QueueMessageInput, QueueMessageResult } from '@extrachill/chat';
+import type { ChatMessage, ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice, ChatRunCapabilities, CancelRunInput, QueueMessageInput, QueueMessageResult } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
 
 /**
@@ -255,6 +255,17 @@ function dispatchResponseMetadata( metadata: Record< string, unknown > ): void {
 	window.dispatchEvent(
 		new CustomEvent( 'frontend-agent-chat:response-metadata', {
 			detail: { metadata },
+		} )
+	);
+}
+
+function dispatchLifecycleEvent( phase: string, detail: Record< string, unknown > = {} ): void {
+	window.dispatchEvent(
+		new CustomEvent( 'frontend-agent-chat:lifecycle', {
+			detail: {
+				phase,
+				...detail,
+			},
 		} )
 	);
 }
@@ -492,6 +503,30 @@ export default function AgentChat( {
 		setSelectedAgentSlug( nextAgentSlug );
 		persistActiveAgent( nextAgentSlug );
 	}, [] );
+	const handleMessage = useCallback( ( message: ChatMessage ) => {
+		if ( message.role !== 'user' ) {
+			return;
+		}
+
+		dispatchLifecycleEvent( 'message-submitted', {
+			agent: activeAgentSlug,
+			message_id: message.id,
+			has_attachments: !! message.attachments?.length,
+		} );
+	}, [ activeAgentSlug ] );
+	const handleError = useCallback( ( error: Error ) => {
+		dispatchLifecycleEvent( 'error', {
+			agent: activeAgentSlug,
+			message: error.message,
+		} );
+	}, [ activeAgentSlug ] );
+	const handleResponseMetadata = useCallback( ( responseMetadata: Record< string, unknown > ) => {
+		dispatchLifecycleEvent( 'response-metadata', {
+			agent: activeAgentSlug,
+			metadata: responseMetadata,
+		} );
+		dispatchResponseMetadata( responseMetadata );
+	}, [ activeAgentSlug ] );
 
 	useEffect( () => {
 		if ( isInline ) {
@@ -710,7 +745,9 @@ export default function AgentChat( {
 						activeAgentName
 					),
 					metadata,
-					onResponseMetadata: dispatchResponseMetadata,
+					onMessage: handleMessage,
+					onError: handleError,
+					onResponseMetadata: handleResponseMetadata,
 					isVisible: isOpen,
 					onUnreadChange: setUnreadCount,
 					emptyState: createElement(
