@@ -155,6 +155,7 @@ function frontend_agent_chat_enqueue() {
 		'expandIconViewBox' => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),
 		'layout'            => 'inline' === ( $config['layout'] ?? '' ) ? 'inline' : 'floating',
 		'isLoggedIn'        => is_user_logged_in(),
+		'capabilities'      => frontend_agent_chat_get_run_control_capabilities( (string) ( $agent['agent_slug'] ?? $default_agent_slug ) ),
 	);
 
 	/**

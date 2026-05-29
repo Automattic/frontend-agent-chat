@@ -64,6 +64,36 @@ function frontend_agent_chat_register_rest_routes(): void {
 
 	register_rest_route(
 		'frontend-agent-chat/v1',
+		'/chat/queue',
+		array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => 'frontend_agent_chat_rest_queue_message',
+			'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
+		'/chat/runs/(?P<run_id>[^/]+)',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => 'frontend_agent_chat_rest_get_run',
+			'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
+		'/chat/runs/(?P<run_id>[^/]+)/cancel',
+		array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => 'frontend_agent_chat_rest_cancel_run',
+			'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
 		'/chat/continue',
 		array(
 			'methods'             => WP_REST_Server::CREATABLE,
@@ -140,6 +170,7 @@ function frontend_agent_chat_rest_bootstrap(): WP_REST_Response {
 				'browser_principal_id'      => is_array( $principal ) ? $principal['id'] : '',
 				'browser_principal_secret'  => false,
 				'session_persistence_scope' => is_user_logged_in() ? 'user' : 'browser',
+				'capabilities'              => frontend_agent_chat_get_run_control_capabilities(),
 			),
 		)
 	);
@@ -355,6 +386,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 			'success' => true,
 			'data'    => array(
 				'session_id'        => $result_session_id,
+				'run_id'            => sanitize_text_field( (string) ( $result['run_id'] ?? '' ) ),
 				'response'          => (string) ( $result['reply'] ?? '' ),
 				'tool_calls'        => is_array( $result['tool_calls'] ?? null ) ? $result['tool_calls'] : array(),
 				'conversation'      => $conversation,
@@ -364,6 +396,140 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 				'turn_number'       => 1,
 				'max_turns_reached' => false,
 			),
+		)
+	);
+}
+
+/**
+ * Get the status for a canonical Agents API chat run.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_get_run( WP_REST_Request $request ) {
+	$run_id     = sanitize_text_field( (string) $request['run_id'] );
+	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	if ( '' === $run_id || '' === $session_id ) {
+		return new WP_Error( 'frontend_agent_chat_invalid_run', __( 'run_id and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$result = frontend_agent_chat_execute_ability(
+		'agents/get-chat-run',
+		frontend_agent_chat_add_browser_principal_input(
+			array(
+				'run_id'     => $run_id,
+				'session_id' => $session_id,
+			)
+		)
+	);
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => frontend_agent_chat_normalize_run_control_result( is_array( $result ) ? $result : array(), $run_id, $session_id ),
+		)
+	);
+}
+
+/**
+ * Cancel a canonical Agents API chat run.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_cancel_run( WP_REST_Request $request ) {
+	$run_id     = sanitize_text_field( (string) $request['run_id'] );
+	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	if ( '' === $run_id || '' === $session_id ) {
+		return new WP_Error( 'frontend_agent_chat_invalid_run', __( 'run_id and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$result = frontend_agent_chat_execute_ability(
+		'agents/cancel-chat-run',
+		frontend_agent_chat_add_browser_principal_input(
+			array(
+				'run_id'     => $run_id,
+				'session_id' => $session_id,
+			)
+		)
+	);
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$data = frontend_agent_chat_normalize_run_control_result( is_array( $result ) ? $result : array(), $run_id, $session_id );
+	$data['cancelled'] = (bool) ( is_array( $result ) && ( $result['cancelled'] ?? false ) );
+
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => $data,
+		)
+	);
+}
+
+/**
+ * Queue a follow-up chat message through the canonical Agents API queue ability.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
+	$message = trim( (string) $request->get_param( 'message' ) );
+	if ( '' === $message ) {
+		return new WP_Error( 'frontend_agent_chat_empty_message', __( 'Message cannot be empty.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$config     = frontend_agent_chat_get_config();
+	$agent_slug = frontend_agent_chat_rest_get_agent_slug( $request, frontend_agent_chat_get_default_agent_slug( $config ) );
+	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	if ( '' === $agent_slug || '' === $session_id ) {
+		return new WP_Error( 'frontend_agent_chat_invalid_queue_message', __( 'agent and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$attachments = $request->get_param( 'attachments' );
+	$queue_input = array(
+		'agent'          => $agent_slug,
+		'session_id'     => $session_id,
+		'message'        => $message,
+		'attachments'    => is_array( $attachments ) ? $attachments : array(),
+		'client_context' => array(
+			'source'       => 'rest',
+			'client_name'  => 'frontend-agent-chat',
+			'connector_id' => 'frontend-agent-chat',
+		),
+	);
+
+	/**
+	 * Filter the canonical agents/queue-chat-message input sent by the frontend chat widget.
+	 *
+	 * @param array           $queue_input Canonical queue input.
+	 * @param WP_REST_Request $request     REST request.
+	 * @param string          $agent_slug  Selected agent slug.
+	 * @param array           $config      Frontend chat configuration.
+	 */
+	/** @var mixed $queue_input */
+	$queue_input = apply_filters( 'frontend_agent_chat_queue_input', $queue_input, $request, $agent_slug, $config );
+
+	$result = frontend_agent_chat_execute_ability( 'agents/queue-chat-message', frontend_agent_chat_add_browser_principal_input( is_array( $queue_input ) ? $queue_input : array() ) );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$result = is_array( $result ) ? $result : array();
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => array(
+				'queued_message_id' => sanitize_text_field( (string) ( $result['queued_message_id'] ?? '' ) ),
+				'session_id'        => sanitize_text_field( (string) ( $result['session_id'] ?? $session_id ) ),
+				'run_id'            => sanitize_text_field( (string) ( $result['run_id'] ?? '' ) ),
+				'position'          => (int) ( $result['position'] ?? 0 ),
+				'status'            => sanitize_key( (string) ( $result['status'] ?? 'queued' ) ),
+			)
 		)
 	);
 }
@@ -548,6 +714,25 @@ function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ):
 				'session_id' => sanitize_text_field( (string) $request['session_id'] ),
 			),
 		)
+	);
+}
+
+/**
+ * Normalize canonical chat run-control ability output for REST clients.
+ *
+ * @param array  $result     Ability result.
+ * @param string $run_id     Fallback run id.
+ * @param string $session_id Fallback session id.
+ * @return array
+ */
+function frontend_agent_chat_normalize_run_control_result( array $result, string $run_id, string $session_id ): array {
+	return array(
+		'run_id'     => sanitize_text_field( (string) ( $result['run_id'] ?? $run_id ) ),
+		'session_id' => sanitize_text_field( (string) ( $result['session_id'] ?? $session_id ) ),
+		'status'     => sanitize_key( (string) ( $result['status'] ?? '' ) ),
+		'started_at' => sanitize_text_field( (string) ( $result['started_at'] ?? '' ) ),
+		'updated_at' => sanitize_text_field( (string) ( $result['updated_at'] ?? '' ) ),
+		'metadata'   => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
 	);
 }
 
