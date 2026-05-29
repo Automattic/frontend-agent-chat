@@ -313,6 +313,7 @@ function frontend_agent_chat_add_browser_principal_input( array $input ): array 
 		'key'   => $principal['id'],
 		'label' => 'Browser chat session',
 	);
+	$input['session_owner']     = $input['transcript_owner'];
 	return $input;
 }
 
@@ -387,12 +388,17 @@ function frontend_agent_chat_allow_browser_conversation_sessions( bool $allowed,
 	}
 
 	$input_principal  = is_array( $input['principal'] ?? null ) ? $input['principal'] : array();
-	$transcript_owner = is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : array();
+	$session_owner    = is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : array();
+	$transcript_owner = is_array( $input['transcript_owner'] ?? null ) ? $input['transcript_owner'] : $session_owner;
 	if (
 		'browser' !== (string) ( $input_principal['owner_type'] ?? '' ) ||
 		(string) ( $input_principal['owner_key'] ?? '' ) !== $principal['id'] ||
 		'browser' !== (string) ( $transcript_owner['type'] ?? '' ) ||
-		(string) ( $transcript_owner['key'] ?? '' ) !== $principal['id']
+		(string) ( $transcript_owner['key'] ?? '' ) !== $principal['id'] ||
+		( ! empty( $session_owner ) && (
+			'browser' !== (string) ( $session_owner['type'] ?? '' ) ||
+			(string) ( $session_owner['key'] ?? '' ) !== $principal['id']
+		) )
 	) {
 		return false;
 	}
@@ -405,9 +411,85 @@ function frontend_agent_chat_allow_browser_conversation_sessions( bool $allowed,
 	return frontend_agent_chat_user_can_see( frontend_agent_chat_resolve_agent( $agent_slug ) );
 }
 
+/**
+ * Allow anonymous browser principals to use their own chat run-control records.
+ *
+ * @param bool  $allowed Existing permission decision.
+ * @param array $input   Ability input.
+ * @return bool Whether the ability may run.
+ */
+function frontend_agent_chat_allow_browser_run_control( bool $allowed, array $input ): bool {
+	if ( $allowed || is_user_logged_in() ) {
+		return $allowed;
+	}
+
+	$principal = frontend_agent_chat_get_browser_principal();
+	if ( ! $principal ) {
+		return false;
+	}
+
+	$input_principal = is_array( $input['principal'] ?? null ) ? $input['principal'] : array();
+	$session_owner   = is_array( $input['session_owner'] ?? null ) ? $input['session_owner'] : array();
+
+	return 'browser' === (string) ( $input_principal['owner_type'] ?? '' )
+		&& (string) ( $input_principal['owner_key'] ?? '' ) === $principal['id']
+		&& 'browser' === (string) ( $session_owner['type'] ?? '' )
+		&& (string) ( $session_owner['key'] ?? '' ) === $principal['id'];
+}
+
+/**
+ * Check whether an ability is registered.
+ *
+ * @param string $name Ability name.
+ * @return bool Whether the ability is available.
+ */
+function frontend_agent_chat_has_ability( string $name ): bool {
+	if ( function_exists( 'wp_has_ability' ) ) {
+		return (bool) wp_has_ability( $name );
+	}
+
+	return function_exists( 'wp_get_ability' ) && null !== wp_get_ability( $name );
+}
+
+/**
+ * Detect run-control support for the current frontend chat principal.
+ *
+ * @param string $agent_slug Optional selected agent slug.
+ * @return array{chat_run_status:bool,chat_run_cancel:bool,chat_message_queue:bool}
+ */
+function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = '' ): array {
+	$agent_slug = sanitize_title( $agent_slug );
+	$can_chat   = true;
+
+	if ( '' !== $agent_slug ) {
+		$can_chat = frontend_agent_chat_user_can_see( frontend_agent_chat_resolve_agent( $agent_slug ) );
+	}
+
+	$capabilities = array(
+		'chat_run_status'   => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
+		'chat_run_cancel'   => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
+		'chat_message_queue' => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
+	);
+
+	/**
+	 * Filter detected frontend chat run-control capabilities.
+	 *
+	 * @param array  $capabilities Capability flags.
+	 * @param string $agent_slug    Selected agent slug, when known.
+	 */
+	$filtered = apply_filters( 'frontend_agent_chat_run_control_capabilities', $capabilities, $agent_slug );
+
+	return is_array( $filtered ) ? array(
+		'chat_run_status'   => ! empty( $filtered['chat_run_status'] ),
+		'chat_run_cancel'   => ! empty( $filtered['chat_run_cancel'] ),
+		'chat_message_queue' => ! empty( $filtered['chat_message_queue'] ),
+	) : $capabilities;
+}
+
 if ( function_exists( 'add_filter' ) ) {
 	add_filter( 'agents_api_execution_principal', 'frontend_agent_chat_resolve_browser_execution_principal', 10, 2 );
 	add_filter( 'agents_conversation_sessions_permission', 'frontend_agent_chat_allow_browser_conversation_sessions', 10, 2 );
+	add_filter( 'agents_chat_run_control_permission', 'frontend_agent_chat_allow_browser_run_control', 10, 2 );
 }
 
 /**

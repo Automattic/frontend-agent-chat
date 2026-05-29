@@ -55,6 +55,11 @@ declare global {
 				actionUrl?: string;
 			};
 			messageSuggestions?: ChatMessageSuggestion[];
+			capabilities?: {
+				chat_run_status?: boolean;
+				chat_run_cancel?: boolean;
+				chat_message_queue?: boolean;
+			};
 		};
 	}
 }
@@ -104,6 +109,7 @@ function init(): void {
 			loadingMessages: config.loadingMessages ?? true,
 			persistenceCta: config.persistenceCta,
 			messageSuggestions: config.messageSuggestions,
+			capabilities: config.capabilities,
 		} )
 	);
 }
