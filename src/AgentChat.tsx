@@ -385,18 +385,56 @@ function renderQuestionCard( group: ToolGroup, context: ToolRendererContext ): R
 	} );
 }
 
+function generationErrorMessage( group: ToolGroup ): string {
+	const content = group.resultMessage?.content?.trim();
+	if ( ! content ) {
+		return __( 'The site generator could not be started. Try again or adjust the request.', 'frontend-agent-chat' );
+	}
+
+	try {
+		const parsed = JSON.parse( content ) as unknown;
+		if ( parsed && typeof parsed === 'object' && ! Array.isArray( parsed ) ) {
+			const record = parsed as Record<string, unknown>;
+			const error = record.error;
+			if ( typeof error === 'string' && error.trim() ) {
+				return error.trim();
+			}
+
+			if ( error && typeof error === 'object' && ! Array.isArray( error ) ) {
+				const message = ( error as Record<string, unknown> ).message;
+				if ( typeof message === 'string' && message.trim() ) {
+					return message.trim();
+				}
+			}
+
+			const message = record.message;
+			if ( typeof message === 'string' && message.trim() ) {
+				return message.trim();
+			}
+		}
+	} catch {
+		// Tool results are often plain text. Use the raw content below.
+	}
+
+	return content;
+}
+
 function renderGenerationCard( group: ToolGroup ): ReactNode {
+	const hasError = group.success === false;
+	const errorMessage = hasError ? generationErrorMessage( group ) : '';
+
 	return createElement(
 		'div',
-		{ className: `frontend-agent-chat__tool-card frontend-agent-chat__tool-card--generation${ group.success === false ? ' has-error' : '' }` },
-		createElement( 'div', { className: 'frontend-agent-chat__tool-card-title' }, __( 'WordPress preview', 'frontend-agent-chat' ) ),
+		{ className: `frontend-agent-chat__tool-card frontend-agent-chat__tool-card--generation${ hasError ? ' has-error' : '' }` },
+		createElement( 'div', { className: 'frontend-agent-chat__tool-card-title' }, __( 'WordPress Site Generator', 'frontend-agent-chat' ) ),
 		createElement(
 			'p',
 			{ className: 'frontend-agent-chat__tool-card-copy' },
-			group.success === false
-				? __( 'The preview could not be started. Try again with a shorter brief or adjust the request.', 'frontend-agent-chat' )
-				: __( 'Studio Web is preparing your WordPress preview from the captured site brief.', 'frontend-agent-chat' )
-		)
+			hasError
+				? __( 'The WordPress site generator could not be started.', 'frontend-agent-chat' )
+				: __( 'Studio Web is preparing your WordPress site from the captured site brief.', 'frontend-agent-chat' )
+		),
+		hasError && createElement( 'p', { className: 'frontend-agent-chat__tool-card-error' }, errorMessage )
 	);
 }
 
