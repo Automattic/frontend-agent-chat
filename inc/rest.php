@@ -159,6 +159,8 @@ add_action( 'rest_api_init', 'frontend_agent_chat_register_rest_routes' );
 function frontend_agent_chat_rest_bootstrap(): WP_REST_Response {
 	$had_principal = null !== frontend_agent_chat_get_browser_principal();
 	$principal     = frontend_agent_chat_ensure_browser_principal_cookie();
+	$config        = frontend_agent_chat_get_config();
+	$agent_slug    = frontend_agent_chat_get_default_agent_slug( $config );
 
 	return rest_ensure_response(
 		array(
@@ -170,7 +172,7 @@ function frontend_agent_chat_rest_bootstrap(): WP_REST_Response {
 				'browser_principal_id'      => is_array( $principal ) ? $principal['id'] : '',
 				'browser_principal_secret'  => false,
 				'session_persistence_scope' => is_user_logged_in() ? 'user' : 'browser',
-				'capabilities'              => frontend_agent_chat_get_run_control_capabilities(),
+				'capabilities'              => frontend_agent_chat_get_run_control_capabilities( $agent_slug ),
 			),
 		)
 	);
