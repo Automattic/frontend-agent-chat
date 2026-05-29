@@ -106,7 +106,7 @@ function frontend_agent_chat_list_accessible_agents(): array {
 }
 
 /**
- * Read the current user's active Data Machine agent preference when available.
+ * Read the current user's active agent preference.
  *
  * @return string Active agent slug or empty string.
  */
@@ -116,12 +116,7 @@ function frontend_agent_chat_get_active_agent_slug(): string {
 		return sanitize_title( (string) ( $preferences['active_agent_slug'] ?? '' ) );
 	}
 
-	$result = frontend_agent_chat_execute_ability( 'datamachine/get-active-agent', array() );
-	if ( is_wp_error( $result ) || ! is_array( $result ) || empty( $result['success'] ) ) {
-		return '';
-	}
-
-	return sanitize_title( (string) ( $result['agent_slug'] ?? '' ) );
+	return sanitize_title( (string) get_user_meta( get_current_user_id(), 'frontend_agent_chat_active_agent_slug', true ) );
 }
 
 /**
@@ -150,8 +145,6 @@ function frontend_agent_chat_get_default_agent_slug( ?array $config = null ): st
 /**
  * Persist an anonymous browser preference keyed by the browser principal.
  *
- * Logged-in users keep using Data Machine's normal user-owned preference.
- *
  * @param string $agent_slug Active agent slug.
  * @return bool Whether the preference was stored.
  */
@@ -170,6 +163,21 @@ function frontend_agent_chat_set_browser_active_agent_slug( string $agent_slug )
 		array( 'active_agent_slug' => sanitize_title( $agent_slug ) ),
 		false
 	);
+}
+
+/**
+ * Persist the current user's active agent preference.
+ *
+ * @param string $agent_slug Active agent slug.
+ * @return bool Whether the preference was stored.
+ */
+function frontend_agent_chat_set_user_active_agent_slug( string $agent_slug ): bool {
+	$user_id = get_current_user_id();
+	if ( $user_id <= 0 ) {
+		return false;
+	}
+
+	return false !== update_user_meta( $user_id, 'frontend_agent_chat_active_agent_slug', sanitize_title( $agent_slug ) );
 }
 
 /**

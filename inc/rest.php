@@ -229,7 +229,7 @@ function frontend_agent_chat_rest_list_agents(): WP_REST_Response {
 }
 
 /**
- * Get the current user's active Data Machine agent preference.
+ * Get the current user's active agent preference.
  *
  * @return WP_REST_Response
  */
@@ -245,7 +245,7 @@ function frontend_agent_chat_rest_get_active_agent(): WP_REST_Response {
 }
 
 /**
- * Persist the current user's active Data Machine agent preference.
+ * Persist the current user's active agent preference.
  *
  * @param WP_REST_Request $request REST request.
  * @return WP_REST_Response|WP_Error
@@ -275,19 +275,15 @@ function frontend_agent_chat_rest_set_active_agent( WP_REST_Request $request ) {
 		);
 	}
 
-	$result = frontend_agent_chat_execute_ability( 'datamachine/set-active-agent', array( 'agent' => $agent_slug ) );
-	if ( is_wp_error( $result ) ) {
-		return $result;
-	}
-	if ( empty( $result['success'] ) ) {
-		return new WP_Error( 'frontend_agent_chat_active_agent_failed', (string) ( $result['error'] ?? __( 'Failed to set active agent.', 'frontend-agent-chat' ) ), array( 'status' => 400 ) );
+	if ( ! frontend_agent_chat_set_user_active_agent_slug( $agent_slug ) ) {
+		return new WP_Error( 'frontend_agent_chat_active_agent_failed', __( 'Failed to set active agent.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
 	return rest_ensure_response(
 		array(
 			'success' => true,
 			'data'    => array(
-				'agent_slug' => sanitize_title( (string) ( $result['agent_slug'] ?? $agent_slug ) ),
+				'agent_slug' => $agent_slug,
 			),
 		)
 	);
@@ -362,8 +358,8 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 	/**
 	 * Filter the canonical agents/chat input sent by the frontend chat widget.
 	 *
-	 * Domain plugins can use this to add runtime context, such as a Data Machine
-	 * execution mode, without hardcoding product-specific behavior here.
+	 * Domain plugins can use this to add runtime context without hardcoding
+	 * product-specific behavior here.
 	 *
 	 * @param array           $chat_input Canonical agents/chat input.
 	 * @param WP_REST_Request $request    REST request.
