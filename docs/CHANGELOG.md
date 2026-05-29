@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.9.0] - 2026-05-29
+
+### Added
+- emit chat lifecycle events
+- wire chat run controls
+- add chat run-control REST adapter
+- render question tool cards
+- pass message suggestions to chat
+- dispatch chat response metadata
+- support inline chat layout
+- support svg fab icons
+- allow domain plugins to expose chat agents
+
+### Changed
+- use canonical run-control capability probe
+
+### Fixed
+- remove Data Machine agent preference coupling
+- preserve agent when restoring sessions
+- clarify site generator tool card
+- bootstrap browser sessions before chat mount
+- detect default run-control abilities
+- detect run-control handlers per agent
+- restore chat bubble radius
+- render Studio Web generation tool status
+- resolve browser principals for session history
+- preserve tool call IDs
+- pin chat question card behavior
+- hide default persistence banner
+
 ## [0.8.7] - 2026-05-25
 
 ### Fixed
