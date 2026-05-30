@@ -21,6 +21,7 @@ import {
 	Chat,
 	DiffCard,
 	QuestionCard,
+	ToolMessage,
 	useClientContextMetadata,
 	parseCanonicalDiffFromToolGroup,
 } from '@extrachill/chat';
@@ -118,6 +119,25 @@ interface AgentsResponse {
 		default_agent_slug?: string;
 		agents?: AgentSummary[];
 	};
+}
+
+type ArtifactPhaseStatus = 'pending' | 'running' | 'completed' | 'failed' | 'retrying';
+
+interface ArtifactThumbnail {
+	url: string;
+	alt?: string;
+}
+
+interface ArtifactStatusPayload {
+	title: string;
+	phase: string;
+	status: ArtifactPhaseStatus;
+	description?: string;
+	diagnosticsCount?: number;
+	previewUrl?: string;
+	materializedUrl?: string;
+	thumbnails: ArtifactThumbnail[];
+	error?: string;
 }
 
 const DEFAULT_EXPAND_ICON_PATH = 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
@@ -327,6 +347,213 @@ function parseJsonObject( value: string ): Record< string, unknown > | null {
 	}
 }
 
+function asRecord( value: unknown ): Record< string, unknown > | null {
+	return value && typeof value === 'object' && ! Array.isArray( value )
+		? value as Record< string, unknown >
+		: null;
+}
+
+function readString( source: Record< string, unknown >, keys: string[] ): string | undefined {
+	for ( const key of keys ) {
+		const value = source[ key ];
+		if ( typeof value === 'string' && value.trim() ) {
+			return value.trim();
+		}
+	}
+
+	return undefined;
+}
+
+function readNumber( source: Record< string, unknown >, keys: string[] ): number | undefined {
+	for ( const key of keys ) {
+		const value = source[ key ];
+		if ( typeof value === 'number' && Number.isFinite( value ) ) {
+			return value;
+		}
+	}
+
+	return undefined;
+}
+
+function titleFromPhase( phase: string ): string {
+	return phase
+		.replace( /[-_]+/g, ' ' )
+		.replace( /\b\w/g, ( match ) => match.toUpperCase() );
+}
+
+function normalizeArtifactStatus( status: unknown ): ArtifactPhaseStatus | null {
+	if ( typeof status !== 'string' ) {
+		return null;
+	}
+
+	const normalized = status.trim().toLowerCase();
+	if ( [ 'pending', 'running', 'completed', 'failed', 'retrying' ].includes( normalized ) ) {
+		return normalized as ArtifactPhaseStatus;
+	}
+
+	return null;
+}
+
+function firstNestedRecord( source: Record< string, unknown >, keys: string[] ): Record< string, unknown > | null {
+	for ( const key of keys ) {
+		const record = asRecord( source[ key ] );
+		if ( record ) {
+			return record;
+		}
+	}
+
+	return null;
+}
+
+function unwrapArtifactSource( source: Record< string, unknown > ): Record< string, unknown > {
+	return firstNestedRecord( source, [ 'artifact_phase', 'artifactPhase', 'phase_metadata', 'phaseMetadata', 'artifact_status', 'artifactStatus' ] ) ?? source;
+}
+
+function collectArtifactSources( group: ToolGroup ): Record< string, unknown >[] {
+	const sources: Record< string, unknown >[] = [ group.parameters ];
+	const result = group.resultMessage ? parseJsonObject( group.resultMessage.content ) : null;
+	if ( result ) {
+		sources.push( result );
+		const nestedResult = asRecord( result.result );
+		if ( nestedResult ) {
+			sources.push( nestedResult );
+		}
+		const nestedData = asRecord( result.data );
+		if ( nestedData ) {
+			sources.push( nestedData );
+		}
+	}
+
+	return sources.map( unwrapArtifactSource );
+}
+
+function getArtifactSourceValue( sources: Record< string, unknown >[], keys: string[] ): unknown {
+	for ( const source of sources ) {
+		for ( const key of keys ) {
+			if ( source[ key ] !== undefined && source[ key ] !== null ) {
+				return source[ key ];
+			}
+		}
+	}
+
+	return undefined;
+}
+
+function readArtifactString( sources: Record< string, unknown >[], keys: string[] ): string | undefined {
+	for ( const source of sources ) {
+		const value = readString( source, keys );
+		if ( value ) {
+			return value;
+		}
+	}
+
+	return undefined;
+}
+
+function readArtifactNumber( sources: Record< string, unknown >[], keys: string[] ): number | undefined {
+	for ( const source of sources ) {
+		const value = readNumber( source, keys );
+		if ( value !== undefined ) {
+			return value;
+		}
+	}
+
+	return undefined;
+}
+
+function normalizeThumbnail( value: unknown ): ArtifactThumbnail | null {
+	if ( typeof value === 'string' && value.trim() ) {
+		return { url: value.trim() };
+	}
+
+	const record = asRecord( value );
+	if ( ! record ) {
+		return null;
+	}
+
+	const url = readString( record, [ 'thumbnail_url', 'thumbnailUrl', 'thumb_url', 'thumbUrl', 'url', 'src' ] );
+	if ( ! url ) {
+		return null;
+	}
+
+	return {
+		url,
+		alt: readString( record, [ 'alt', 'alt_text', 'altText', 'label', 'title' ] ),
+	};
+}
+
+function collectArtifactThumbnails( sources: Record< string, unknown >[] ): ArtifactThumbnail[] {
+	const thumbnails: ArtifactThumbnail[] = [];
+	const thumbnailValue = getArtifactSourceValue( sources, [ 'thumbnails', 'thumbnail_urls', 'thumbnailUrls', 'assets', 'imported_assets', 'importedAssets' ] );
+	const rawThumbnails = Array.isArray( thumbnailValue ) ? thumbnailValue : thumbnailValue ? [ thumbnailValue ] : [];
+
+	for ( const value of rawThumbnails ) {
+		const thumbnail = normalizeThumbnail( value );
+		if ( thumbnail ) {
+			thumbnails.push( thumbnail );
+		}
+	}
+
+	return thumbnails.slice( 0, 4 );
+}
+
+function artifactDiagnosticsCount( sources: Record< string, unknown >[] ): number | undefined {
+	const explicitCount = readArtifactNumber( sources, [ 'diagnostics_count', 'diagnosticsCount', 'diagnostic_count', 'diagnosticCount' ] );
+	if ( explicitCount !== undefined ) {
+		return explicitCount;
+	}
+
+	const diagnostics = getArtifactSourceValue( sources, [ 'diagnostics', 'issues', 'warnings' ] );
+	if ( Array.isArray( diagnostics ) ) {
+		return diagnostics.length;
+	}
+
+	const diagnosticsRecord = asRecord( diagnostics );
+	return diagnosticsRecord ? Object.keys( diagnosticsRecord ).length : undefined;
+}
+
+function artifactErrorMessage( sources: Record< string, unknown >[] ): string | undefined {
+	const explicitError = readArtifactString( sources, [ 'error', 'error_message', 'errorMessage', 'failure_reason', 'failureReason' ] );
+	if ( explicitError ) {
+		return explicitError;
+	}
+
+	for ( const source of sources ) {
+		const error = asRecord( source.error );
+		const message = error ? readString( error, [ 'message', 'detail' ] ) : undefined;
+		if ( message ) {
+			return message;
+		}
+	}
+
+	return undefined;
+}
+
+function artifactPayloadFromToolGroup( group: ToolGroup ): ArtifactStatusPayload | null {
+	const sources = collectArtifactSources( group );
+	const phase = readArtifactString( sources, [ 'phase', 'artifact_phase', 'artifactPhase', 'step', 'stage' ] );
+	const status = normalizeArtifactStatus( getArtifactSourceValue( sources, [ 'status', 'state', 'phase_status', 'phaseStatus' ] ) )
+		?? ( group.success === false ? 'failed' : group.success === true ? 'completed' : null );
+
+	if ( ! phase || ! status ) {
+		return null;
+	}
+
+	const title = readArtifactString( sources, [ 'title', 'label', 'name' ] ) ?? titleFromPhase( phase );
+
+	return {
+		title,
+		phase,
+		status,
+		description: readArtifactString( sources, [ 'description', 'message', 'summary', 'detail' ] ),
+		diagnosticsCount: artifactDiagnosticsCount( sources ),
+		previewUrl: readArtifactString( sources, [ 'preview_url', 'previewUrl', 'url' ] ),
+		materializedUrl: readArtifactString( sources, [ 'materialized_url', 'materializedUrl', 'final_url', 'finalUrl', 'result_url', 'resultUrl' ] ),
+		thumbnails: collectArtifactThumbnails( sources ),
+		error: artifactErrorMessage( sources ),
+	};
+}
+
 function normalizeQuestionChoice( value: unknown ): QuestionChoice | null {
 	if ( ! value || typeof value !== 'object' || Array.isArray( value ) ) {
 		return null;
@@ -435,6 +662,106 @@ function renderGenerationCard( group: ToolGroup ): ReactNode {
 				: __( 'Studio Web is preparing your WordPress site from the captured site brief.', 'frontend-agent-chat' )
 		),
 		hasError && createElement( 'p', { className: 'frontend-agent-chat__tool-card-error' }, errorMessage )
+	);
+}
+
+function artifactStatusLabel( status: ArtifactPhaseStatus ): string {
+	switch ( status ) {
+		case 'pending':
+			return __( 'Pending', 'frontend-agent-chat' );
+		case 'running':
+			return __( 'Running', 'frontend-agent-chat' );
+		case 'completed':
+			return __( 'Completed', 'frontend-agent-chat' );
+		case 'failed':
+			return __( 'Failed', 'frontend-agent-chat' );
+		case 'retrying':
+			return __( 'Retrying', 'frontend-agent-chat' );
+	}
+}
+
+function artifactStatusCopy( payload: ArtifactStatusPayload ): string {
+	if ( payload.description ) {
+		return payload.description;
+	}
+
+	switch ( payload.status ) {
+		case 'pending':
+			return __( 'Waiting to start this artifact phase.', 'frontend-agent-chat' );
+		case 'running':
+			return __( 'This artifact phase is in progress.', 'frontend-agent-chat' );
+		case 'completed':
+			return __( 'This artifact phase completed successfully.', 'frontend-agent-chat' );
+		case 'failed':
+			return __( 'This artifact phase failed.', 'frontend-agent-chat' );
+		case 'retrying':
+			return __( 'Retrying this artifact phase.', 'frontend-agent-chat' );
+	}
+}
+
+function renderArtifactStatusCard( group: ToolGroup ): ReactNode {
+	const payload = artifactPayloadFromToolGroup( group );
+	if ( ! payload ) {
+		return createElement( ToolMessage, { group } );
+	}
+
+	const hasError = payload.status === 'failed';
+	const linkUrl = payload.materializedUrl ?? payload.previewUrl;
+	const linkLabel = payload.materializedUrl
+		? __( 'Open result', 'frontend-agent-chat' )
+		: __( 'Open preview', 'frontend-agent-chat' );
+
+	return createElement(
+		'div',
+		{ className: `frontend-agent-chat__tool-card frontend-agent-chat__artifact-card is-${ payload.status }${ hasError ? ' has-error' : '' }` },
+		createElement(
+			'div',
+			{ className: 'frontend-agent-chat__artifact-card-header' },
+			createElement( 'div', null,
+				createElement( 'div', { className: 'frontend-agent-chat__tool-card-title' }, payload.title ),
+				createElement( 'div', { className: 'frontend-agent-chat__artifact-card-phase' }, payload.phase )
+			),
+			createElement( 'span', { className: 'frontend-agent-chat__artifact-card-status' }, artifactStatusLabel( payload.status ) )
+		),
+		createElement(
+			'p',
+			{ className: 'frontend-agent-chat__tool-card-copy' },
+			artifactStatusCopy( payload )
+		),
+		payload.thumbnails.length > 0 && createElement(
+			'div',
+			{ className: 'frontend-agent-chat__artifact-card-thumbnails', 'aria-label': __( 'Imported assets', 'frontend-agent-chat' ) },
+			payload.thumbnails.map( ( thumbnail, index ) => createElement( 'img', {
+				key: `${ thumbnail.url }-${ index }`,
+				src: thumbnail.url,
+				alt: thumbnail.alt ?? '',
+				loading: 'lazy',
+			} ) )
+		),
+		( payload.diagnosticsCount !== undefined || linkUrl ) && createElement(
+			'div',
+			{ className: 'frontend-agent-chat__artifact-card-meta' },
+			payload.diagnosticsCount !== undefined && createElement(
+				'span',
+				{ className: 'frontend-agent-chat__artifact-card-meta-item' },
+				sprintf(
+					/* translators: %d: number of diagnostics. */
+					__( '%d diagnostics', 'frontend-agent-chat' ),
+					payload.diagnosticsCount
+				)
+			),
+			linkUrl && createElement(
+				'a',
+				{
+					className: 'frontend-agent-chat__artifact-card-link',
+					href: linkUrl,
+					target: '_blank',
+					rel: 'noreferrer',
+				},
+				linkLabel
+			)
+		),
+		hasError && payload.error && createElement( 'p', { className: 'frontend-agent-chat__tool-card-error' }, payload.error )
 	);
 }
 
@@ -650,6 +977,10 @@ export default function AgentChat( {
 
 	const toolRenderers = useMemo(
 		() => ( {
+			artifact_phase: renderArtifactStatusCard,
+			artifact_status: renderArtifactStatusCard,
+			artifact_status_update: renderArtifactStatusCard,
+			artifact_task_status: renderArtifactStatusCard,
 			edit_post_blocks: renderDiffCard,
 			replace_post_blocks: renderDiffCard,
 			insert_content: renderDiffCard,

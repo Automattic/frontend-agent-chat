@@ -362,6 +362,100 @@
 	white-space: pre-wrap;
 }
 
+.frontend-agent-chat__artifact-card.is-running,
+.frontend-agent-chat__artifact-card.is-retrying {
+	border-color: var(--frontend-agent-chat-accent-border, #bfdbfe);
+}
+
+.frontend-agent-chat__artifact-card.is-completed {
+	border-color: var(--frontend-agent-chat-success-border, #bbf7d0);
+}
+
+.frontend-agent-chat__artifact-card-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 6px;
+}
+
+.frontend-agent-chat__artifact-card-phase {
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+	font-size: 12px;
+	line-height: 1.35;
+}
+
+.frontend-agent-chat__artifact-card-status {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px 8px;
+	border-radius: 999px;
+	background: var(--frontend-agent-chat-muted-bg, #f1f5f9);
+	color: var(--frontend-agent-chat-text-muted, #475569);
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1.2;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+
+.frontend-agent-chat__artifact-card.is-running .frontend-agent-chat__artifact-card-status,
+.frontend-agent-chat__artifact-card.is-retrying .frontend-agent-chat__artifact-card-status {
+	background: var(--frontend-agent-chat-accent-soft-bg, #dbeafe);
+	color: var(--frontend-agent-chat-accent, #2563eb);
+}
+
+.frontend-agent-chat__artifact-card.is-completed .frontend-agent-chat__artifact-card-status {
+	background: var(--frontend-agent-chat-success-bg, #dcfce7);
+	color: var(--frontend-agent-chat-success-text, #166534);
+}
+
+.frontend-agent-chat__artifact-card.is-failed .frontend-agent-chat__artifact-card-status {
+	background: var(--frontend-agent-chat-error-detail-bg, rgba(127, 29, 29, 0.08));
+	color: var(--frontend-agent-chat-error-text, #991b1b);
+}
+
+.frontend-agent-chat__artifact-card-thumbnails {
+	display: flex;
+	gap: 6px;
+	margin-top: 10px;
+	overflow: hidden;
+}
+
+.frontend-agent-chat__artifact-card-thumbnails img {
+	width: 44px;
+	height: 44px;
+	border: 1px solid var(--frontend-agent-chat-border-color, #e2e8f0);
+	border-radius: 10px;
+	object-fit: cover;
+	background: var(--frontend-agent-chat-muted-bg, #f8fafc);
+}
+
+.frontend-agent-chat__artifact-card-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 10px;
+	font-size: 12px;
+	line-height: 1.35;
+}
+
+.frontend-agent-chat__artifact-card-meta-item {
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+}
+
+.frontend-agent-chat__artifact-card-link {
+	color: var(--frontend-agent-chat-accent, #2563eb);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.frontend-agent-chat__artifact-card-link:hover {
+	text-decoration: underline;
+}
+
 .frontend-agent-chat__empty {
 	text-align: center;
 	padding: var(--frontend-agent-chat-spacing-lg, 24px);
