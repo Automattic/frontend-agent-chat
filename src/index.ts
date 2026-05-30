@@ -59,6 +59,7 @@ declare global {
 				chat_run_status?: boolean;
 				chat_run_cancel?: boolean;
 				chat_message_queue?: boolean;
+				chat_run_events?: boolean;
 			};
 		};
 	}
