@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.2] - 2026-05-31
+
+### Changed
+- bump @extrachill/chat to v0.13.0
+
+### Fixed
+- de-nest ternaries in artifact thumbnail and status helpers
+- consume chat run events
+- render artifact phase status cards
+
 ## [0.9.1] - 2026-05-29
 
 ### Fixed
