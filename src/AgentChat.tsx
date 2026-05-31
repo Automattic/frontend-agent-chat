@@ -1066,6 +1066,7 @@ export default function AgentChat( {
 			edit_post_blocks: renderDiffCard,
 			replace_post_blocks: renderDiffCard,
 			insert_content: renderDiffCard,
+			present_question: renderQuestionCard,
 			studio_web_propose_questions: renderQuestionCard,
 			studio_web_start_generation: renderGenerationCard,
 		} ),
