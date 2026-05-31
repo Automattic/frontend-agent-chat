@@ -550,7 +550,12 @@ function normalizeThumbnail( value: unknown ): ArtifactThumbnail | null {
 function collectArtifactThumbnails( sources: Record< string, unknown >[] ): ArtifactThumbnail[] {
 	const thumbnails: ArtifactThumbnail[] = [];
 	const thumbnailValue = getArtifactSourceValue( sources, [ 'thumbnails', 'thumbnail_urls', 'thumbnailUrls', 'assets', 'imported_assets', 'importedAssets' ] );
-	const rawThumbnails = Array.isArray( thumbnailValue ) ? thumbnailValue : thumbnailValue ? [ thumbnailValue ] : [];
+	let rawThumbnails: unknown[] = [];
+	if ( Array.isArray( thumbnailValue ) ) {
+		rawThumbnails = thumbnailValue;
+	} else if ( thumbnailValue ) {
+		rawThumbnails = [ thumbnailValue ];
+	}
 
 	for ( const value of rawThumbnails ) {
 		const thumbnail = normalizeThumbnail( value );
@@ -597,8 +602,14 @@ function artifactErrorMessage( sources: Record< string, unknown >[] ): string | 
 function artifactPayloadFromToolGroup( group: ToolGroup ): ArtifactStatusPayload | null {
 	const sources = collectArtifactSources( group );
 	const phase = readArtifactString( sources, [ 'phase', 'artifact_phase', 'artifactPhase', 'step', 'stage' ] );
+	let statusFromSuccess: ArtifactStatusPayload[ 'status' ] | null = null;
+	if ( group.success === false ) {
+		statusFromSuccess = 'failed';
+	} else if ( group.success === true ) {
+		statusFromSuccess = 'completed';
+	}
 	const status = normalizeArtifactStatus( getArtifactSourceValue( sources, [ 'status', 'state', 'phase_status', 'phaseStatus' ] ) )
-		?? ( group.success === false ? 'failed' : group.success === true ? 'completed' : null );
+		?? statusFromSuccess;
 
 	if ( ! phase || ! status ) {
 		return null;
