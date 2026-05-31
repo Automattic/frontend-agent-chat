@@ -87,6 +87,24 @@ class FrontendAgentChatRunControlFakeAbility {
 			);
 		}
 
+		if ( 'agents/list-chat-run-events' === $this->name ) {
+			return array(
+				'run_id'     => $input['run_id'],
+				'session_id' => $input['session_id'],
+				'status'     => 'running',
+				'events'     => array(
+					array(
+						'id'         => '1',
+						'type'       => 'turn_started',
+						'created_at' => '2026-05-29T00:00:00Z',
+						'metadata'   => array( 'turn' => 1 ),
+					),
+				),
+				'cursor'     => '1',
+				'has_more'   => false,
+			);
+		}
+
 		if ( 'agents/queue-chat-message' === $this->name ) {
 			return array(
 				'queued_message_id' => 'queued-1',
@@ -200,6 +218,7 @@ $GLOBALS['frontend_agent_chat_run_control_abilities'] = array(
 	'agents/list-accessible-agents',
 	'agents/can-access-agent',
 	'agents/get-chat-run',
+	'agents/list-chat-run-events',
 	'agents/cancel-chat-run',
 	'agents/queue-chat-message',
 );
@@ -210,10 +229,14 @@ $capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' )
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_status'], 'status capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_cancel'], 'cancel capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_message_queue'], 'queue capability requires canonical ability', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_events'], 'events capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( 'agents/list-accessible-agents', $GLOBALS['frontend_agent_chat_run_control_calls'][0][0] ?? '', 'capability detection checks selected agent access', $failures, $passes );
 
 $run_response = frontend_agent_chat_rest_get_run( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_run_control_assert_equals( 'running', $run_response['data']['status'] ?? '', 'run status is normalized', $failures, $passes );
+
+$events_response = frontend_agent_chat_rest_list_run_events( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent', 'cursor' => '0' ) ) );
+frontend_agent_chat_run_control_assert_equals( 'turn_started', $events_response['data']['events'][0]['type'] ?? '', 'run events are normalized', $failures, $passes );
 
 $cancel_response = frontend_agent_chat_rest_cancel_run( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_run_control_assert_equals( true, $cancel_response['data']['cancelled'] ?? false, 'cancel response is normalized', $failures, $passes );

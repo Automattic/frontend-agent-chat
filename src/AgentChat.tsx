@@ -66,6 +66,7 @@ interface AgentChatProps {
 		chat_run_status?: boolean;
 		chat_run_cancel?: boolean;
 		chat_message_queue?: boolean;
+		chat_run_events?: boolean;
 	};
 }
 
@@ -91,6 +92,26 @@ interface RunControlResponse {
 		metadata?: Record< string, unknown >;
 		queued_message_id?: string;
 		position?: number;
+	};
+}
+
+interface ChatRunEvent {
+	id: string;
+	type: string;
+	message?: string;
+	created_at?: string;
+	metadata?: Record< string, unknown >;
+}
+
+interface RunEventsResponse {
+	success?: boolean;
+	data?: {
+		run_id?: string;
+		session_id?: string;
+		status?: string;
+		events?: ChatRunEvent[];
+		cursor?: string;
+		has_more?: boolean;
 	};
 }
 
@@ -288,6 +309,50 @@ function dispatchLifecycleEvent( phase: string, detail: Record< string, unknown 
 			},
 		} )
 	);
+}
+
+function dispatchRunEvent( event: ChatRunEvent, detail: Record< string, unknown > = {} ): void {
+	window.dispatchEvent(
+		new CustomEvent( 'frontend-agent-chat:run-event', {
+			detail: {
+				event,
+				...detail,
+			},
+		} )
+	);
+	dispatchLifecycleEvent( `run:${ event.type }`, {
+		...detail,
+		event,
+	} );
+}
+
+async function dispatchRunEvents( fetchFn: FetchFn, basePath: string, metadata: Record< string, unknown > ): Promise< void > {
+	const runId = metadata.run_id ?? metadata.runId;
+	const sessionId = metadata.session_id ?? metadata.sessionId;
+	if ( typeof runId !== 'string' || ! runId || typeof sessionId !== 'string' || ! sessionId ) {
+		return;
+	}
+
+	let cursor = '0';
+	let hasMore = true;
+	while ( hasMore ) {
+		const separator = `${ basePath }/runs/${ encodeURIComponent( runId ) }/events`.includes( '?' ) ? '&' : '?';
+		const response = await fetchFn( {
+			path: `${ basePath }/runs/${ encodeURIComponent( runId ) }/events${ separator }session_id=${ encodeURIComponent( sessionId ) }&cursor=${ encodeURIComponent( cursor ) }`,
+		} ) as RunEventsResponse;
+		const data = response.data ?? {};
+		for ( const event of data.events ?? [] ) {
+			dispatchRunEvent( event, {
+				run_id: runId,
+				session_id: sessionId,
+				status: data.status,
+			} );
+		}
+
+		const nextCursor = data.cursor ?? cursor;
+		hasMore = !! data.has_more && nextCursor !== cursor;
+		cursor = nextCursor;
+	}
 }
 
 /**
@@ -891,7 +956,13 @@ export default function AgentChat( {
 			metadata: responseMetadata,
 		} );
 		dispatchResponseMetadata( responseMetadata );
-	}, [ activeAgentSlug ] );
+		if ( capabilities?.chat_run_events ) {
+			dispatchRunEvents( agentFetch, basePath, responseMetadata ).catch( ( err: unknown ) => {
+				// eslint-disable-next-line no-console
+				console.error( 'AgentChat: failed to fetch chat run events', err );
+			} );
+		}
+	}, [ activeAgentSlug, agentFetch, basePath, capabilities?.chat_run_events ] );
 
 	useEffect( () => {
 		if ( isInline ) {

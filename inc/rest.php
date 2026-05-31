@@ -84,6 +84,16 @@ function frontend_agent_chat_register_rest_routes(): void {
 
 	register_rest_route(
 		'frontend-agent-chat/v1',
+		'/chat/runs/(?P<run_id>[^/]+)/events',
+		array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => 'frontend_agent_chat_rest_list_run_events',
+			'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
 		'/chat/runs/(?P<run_id>[^/]+)/cancel',
 		array(
 			'methods'             => WP_REST_Server::CREATABLE,
@@ -377,18 +387,24 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 	}
 
 	$result_session_id = sanitize_text_field( (string) ( $result['session_id'] ?? $session_id ) );
+	$result_run_id     = sanitize_text_field( (string) ( $result['run_id'] ?? '' ) );
 	$conversation      = frontend_agent_chat_normalize_result_messages( $result, $message );
+	$metadata          = is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array();
+	if ( '' !== $result_run_id ) {
+		$metadata['run_id']     = $result_run_id;
+		$metadata['session_id'] = $result_session_id;
+	}
 
 	return rest_ensure_response(
 		array(
 			'success' => true,
 			'data'    => array(
 				'session_id'        => $result_session_id,
-				'run_id'            => sanitize_text_field( (string) ( $result['run_id'] ?? '' ) ),
+				'run_id'            => $result_run_id,
 				'response'          => (string) ( $result['reply'] ?? '' ),
 				'tool_calls'        => is_array( $result['tool_calls'] ?? null ) ? $result['tool_calls'] : array(),
 				'conversation'      => $conversation,
-				'metadata'          => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
+				'metadata'          => $metadata,
 				'completed'         => (bool) ( $result['completed'] ?? true ),
 				'max_turns'         => 1,
 				'turn_number'       => 1,
@@ -428,6 +444,47 @@ function frontend_agent_chat_rest_get_run( WP_REST_Request $request ) {
 		array(
 			'success' => true,
 			'data'    => frontend_agent_chat_normalize_run_control_result( is_array( $result ) ? $result : array(), $run_id, $session_id ),
+		)
+	);
+}
+
+/**
+ * List canonical Agents API chat run events.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_list_run_events( WP_REST_Request $request ) {
+	$run_id     = sanitize_text_field( (string) $request['run_id'] );
+	$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+	if ( '' === $run_id || '' === $session_id ) {
+		return new WP_Error( 'frontend_agent_chat_invalid_run', __( 'run_id and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$limit = (int) $request->get_param( 'limit' );
+	if ( $limit <= 0 ) {
+		$limit = 100;
+	}
+
+	$result = frontend_agent_chat_execute_ability(
+		'agents/list-chat-run-events',
+		frontend_agent_chat_add_browser_principal_input(
+			array(
+				'run_id'     => $run_id,
+				'session_id' => $session_id,
+				'cursor'     => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
+				'limit'      => max( 1, min( 1000, $limit ) ),
+			)
+		)
+	);
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => frontend_agent_chat_normalize_run_events_result( is_array( $result ) ? $result : array(), $run_id, $session_id ),
 		)
 	);
 }
@@ -744,6 +801,40 @@ function frontend_agent_chat_normalize_run_control_result( array $result, string
 		'started_at' => sanitize_text_field( (string) ( $result['started_at'] ?? '' ) ),
 		'updated_at' => sanitize_text_field( (string) ( $result['updated_at'] ?? '' ) ),
 		'metadata'   => is_array( $result['metadata'] ?? null ) ? $result['metadata'] : array(),
+	);
+}
+
+/**
+ * Normalize canonical chat run-event ability output for REST clients.
+ *
+ * @param array  $result     Ability result.
+ * @param string $run_id     Fallback run id.
+ * @param string $session_id Fallback session id.
+ * @return array
+ */
+function frontend_agent_chat_normalize_run_events_result( array $result, string $run_id, string $session_id ): array {
+	$events = array();
+	foreach ( is_array( $result['events'] ?? null ) ? $result['events'] : array() as $event ) {
+		if ( ! is_array( $event ) ) {
+			continue;
+		}
+
+		$events[] = array(
+			'id'         => sanitize_text_field( (string) ( $event['id'] ?? '' ) ),
+			'type'       => sanitize_key( (string) ( $event['type'] ?? '' ) ),
+			'message'    => sanitize_text_field( (string) ( $event['message'] ?? '' ) ),
+			'created_at' => sanitize_text_field( (string) ( $event['created_at'] ?? '' ) ),
+			'metadata'   => is_array( $event['metadata'] ?? null ) ? $event['metadata'] : array(),
+		);
+	}
+
+	return array(
+		'run_id'     => sanitize_text_field( (string) ( $result['run_id'] ?? $run_id ) ),
+		'session_id' => sanitize_text_field( (string) ( $result['session_id'] ?? $session_id ) ),
+		'status'     => sanitize_key( (string) ( $result['status'] ?? '' ) ),
+		'events'     => $events,
+		'cursor'     => sanitize_text_field( (string) ( $result['cursor'] ?? '' ) ),
+		'has_more'   => (bool) ( $result['has_more'] ?? false ),
 	);
 }
 
