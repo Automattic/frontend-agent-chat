@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.0] - 2026-05-31
+
+### Added
+- add present_question generic question-card renderer key
+- forward current page url to chat REST requests
+
+### Fixed
+- remove Studio Web renderer coupling
+
 ## [0.9.2] - 2026-05-31
 
 ### Changed
