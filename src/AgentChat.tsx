@@ -198,6 +198,32 @@ function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejecte
 	} );
 }
 
+/**
+ * Capture the page the widget is currently rendered on.
+ *
+ * Forwarded on POST requests so the backend can supply real page/location
+ * context to the agent. This is intentionally generic: the widget only knows
+ * "the current page" — it carries no product- or runtime-specific knowledge.
+ * Domain plugins decide what to do with it (e.g. compose client context).
+ *
+ * @return Page context fields, or an empty object when unavailable.
+ */
+function getPageContext(): Record< string, string > {
+	if ( typeof window === 'undefined' || ! window.location ) {
+		return {};
+	}
+
+	const context: Record< string, string > = {
+		page_url: window.location.href,
+	};
+
+	if ( typeof document !== 'undefined' && document.title ) {
+		context.page_title = document.title;
+	}
+
+	return context;
+}
+
 function createAgentFetch( agentSlug: string ): FetchFn {
 	return ( options ) => {
 		const method = options.method ?? 'GET';
@@ -209,7 +235,7 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 				: options.path,
 			method: options.method,
 			data: method === 'POST'
-				? { ...( options.data ?? {} ), agent: agentSlug }
+				? { ...getPageContext(), ...( options.data ?? {} ), agent: agentSlug }
 				: options.data,
 			headers: options.headers,
 		} );
