@@ -5,6 +5,7 @@
 	"private": true,
 	"scripts": {
 		"build": "wp-scripts build",
+		"test:unit": "wp-scripts test-unit-js --runInBand",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
