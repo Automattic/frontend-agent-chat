@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Frontend Agent Chat
- * Plugin URI: https://github.com/Extra-Chill/frontend-agent-chat
+ * Plugin URI: https://github.com/Automattic/frontend-agent-chat
  * Description: Floating agent chat widget for WordPress agents powered by Agents API abilities.
  * Version: 0.10.0
  * Author: Chris Huber
