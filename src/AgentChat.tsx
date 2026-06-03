@@ -161,6 +161,15 @@ interface ArtifactStatusPayload {
 	error?: string;
 }
 
+interface SourceCardPayload {
+	title?: string;
+	url?: string;
+	snippet?: string;
+	documentId?: string;
+	chunkId?: string;
+	accessibleLabel?: string;
+}
+
 const DEFAULT_EXPAND_ICON_PATH = 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
 const DEFAULT_COLLAPSE_ICON_PATH = 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5';
 
@@ -455,6 +464,80 @@ function readString( source: Record< string, unknown >, keys: string[] ): string
 	return undefined;
 }
 
+function readSourceCards( source: Record< string, unknown > ): SourceCardPayload[] {
+	const rawSources = source.sources ?? source.citations ?? source.source_cards ?? source.sourceCards;
+	const values = Array.isArray( rawSources ) ? rawSources : rawSources ? [ rawSources ] : [];
+
+	return values
+		.map( normalizeSourceCard )
+		.filter( ( card ): card is SourceCardPayload => !! card );
+}
+
+function normalizeSourceCard( value: unknown ): SourceCardPayload | null {
+	const source = typeof value === 'string' && value.trim()
+		? { url: value.trim() }
+		: asRecord( value );
+	if ( ! source ) {
+		return null;
+	}
+
+	const card: SourceCardPayload = {
+		title: readString( source, [ 'title', 'source_title', 'sourceTitle', 'name', 'label' ] ),
+		url: readString( source, [ 'url', 'source_url', 'sourceUrl', 'href', 'link' ] ),
+		snippet: readString( source, [ 'snippet', 'excerpt', 'summary', 'text', 'content', 'quote' ] ),
+		documentId: readString( source, [ 'document_id', 'documentId', 'doc_id', 'docId', 'document', 'id' ] ),
+		chunkId: readString( source, [ 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ] ),
+		accessibleLabel: readString( source, [ 'accessible_label', 'accessibleLabel', 'aria_label', 'ariaLabel' ] ),
+	};
+
+	return card.title || card.url || card.snippet ? card : null;
+}
+
+function sourceCardHref( url?: string ): string | undefined {
+	if ( ! url ) {
+		return undefined;
+	}
+
+	const trimmed = url.trim();
+	if ( trimmed.startsWith( '/' ) || trimmed.startsWith( '#' ) ) {
+		return trimmed;
+	}
+
+	try {
+		const parsed = new URL( trimmed );
+		return [ 'http:', 'https:' ].includes( parsed.protocol ) ? trimmed : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function sourceCardsFromToolGroup( group: ToolGroup ): SourceCardPayload[] {
+	const sources = readSourceCards( group.parameters );
+	const result = group.resultMessage ? parseJsonObject( group.resultMessage.content ) : null;
+	if ( result ) {
+		sources.push( ...readSourceCards( result ) );
+		const nestedResult = asRecord( result.result );
+		if ( nestedResult ) {
+			sources.push( ...readSourceCards( nestedResult ) );
+		}
+		const nestedData = asRecord( result.data );
+		if ( nestedData ) {
+			sources.push( ...readSourceCards( nestedData ) );
+		}
+	}
+
+	const seen = new Set< string >();
+	return sources.filter( ( source ) => {
+		const key = [ source.url, source.title, source.documentId, source.chunkId, source.snippet ].join( '\u0000' );
+		if ( seen.has( key ) ) {
+			return false;
+		}
+
+		seen.add( key );
+		return true;
+	} ).slice( 0, 8 );
+}
+
 function readNumber( source: Record< string, unknown >, keys: string[] ): number | undefined {
 	for ( const key of keys ) {
 		const value = source[ key ];
@@ -712,6 +795,65 @@ function renderQuestionCard( group: ToolGroup, context: ToolRendererContext ): R
 		disabled: context.isLoading,
 		onSubmitAnswer: context.sendMessage,
 	} );
+}
+
+function renderSourceCards( group: ToolGroup ): ReactNode {
+	const sources = sourceCardsFromToolGroup( group );
+	if ( sources.length === 0 ) {
+		return null;
+	}
+
+	return createElement(
+		'section',
+		{ className: 'frontend-agent-chat__source-cards', 'aria-label': __( 'Sources', 'frontend-agent-chat' ) },
+		createElement( 'div', { className: 'frontend-agent-chat__source-cards-title' }, __( 'Sources', 'frontend-agent-chat' ) ),
+		sources.map( ( source, index ) => {
+			const href = sourceCardHref( source.url );
+			const title = source.title ?? source.url ?? sprintf(
+				/* translators: %d: source index. */
+				__( 'Source %d', 'frontend-agent-chat' ),
+				index + 1
+			);
+			const accessibleLabel = source.accessibleLabel ?? sprintf(
+				/* translators: %s: source title. */
+				__( 'Open source: %s', 'frontend-agent-chat' ),
+				title
+			);
+
+			return createElement(
+				'article',
+				{ key: `${ source.url ?? source.title ?? 'source' }-${ index }`, className: 'frontend-agent-chat__source-card' },
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__source-card-heading' },
+					href ? createElement(
+						'a',
+						{
+							className: 'frontend-agent-chat__source-card-link',
+							href,
+							target: href.startsWith( '#' ) || href.startsWith( '/' ) ? undefined : '_blank',
+							rel: href.startsWith( '#' ) || href.startsWith( '/' ) ? undefined : 'noopener noreferrer',
+							'aria-label': accessibleLabel,
+						},
+						title
+					) : createElement( 'span', { className: 'frontend-agent-chat__source-card-title' }, title )
+				),
+				source.snippet && createElement( 'p', { className: 'frontend-agent-chat__source-card-snippet' }, source.snippet ),
+				( source.documentId || source.chunkId ) && createElement(
+					'dl',
+					{ className: 'frontend-agent-chat__source-card-debug' },
+					source.documentId && createElement( 'div', null,
+						createElement( 'dt', null, __( 'Document', 'frontend-agent-chat' ) ),
+						createElement( 'dd', null, source.documentId )
+					),
+					source.chunkId && createElement( 'div', null,
+						createElement( 'dt', null, __( 'Chunk', 'frontend-agent-chat' ) ),
+						createElement( 'dd', null, source.chunkId )
+					)
+				)
+			);
+		} )
+	);
 }
 
 function artifactStatusLabel( status: ArtifactPhaseStatus ): string {
@@ -1036,6 +1178,9 @@ export default function AgentChat( {
 
 	const toolRenderers = useMemo(
 		() => ( {
+			source_cards: renderSourceCards,
+			sources: renderSourceCards,
+			citations: renderSourceCards,
 			artifact_phase: renderArtifactStatusCard,
 			start_artifact_generation: renderArtifactStatusCard,
 			artifact_status: renderArtifactStatusCard,

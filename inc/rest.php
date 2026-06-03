@@ -872,10 +872,15 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
 			'role'    => 'user',
 			'content' => $user_message,
 		);
-		$messages[] = array(
+		$assistant = array(
 			'role'    => 'assistant',
 			'content' => (string) ( $result['reply'] ?? '' ),
 		);
+		if ( is_array( $result['metadata'] ?? null ) ) {
+			$assistant['metadata'] = $result['metadata'];
+		}
+		$messages[] = $assistant;
+		$messages   = frontend_agent_chat_append_source_card_tool_messages( $messages, $assistant['metadata'] ?? array() );
 	}
 
 	return $messages;
@@ -926,9 +931,156 @@ function frontend_agent_chat_session_messages( array $source ): array {
 		}
 
 		$messages[] = $normalized;
+		if ( 'assistant' === $role ) {
+			$messages = frontend_agent_chat_append_source_card_tool_messages( $messages, $normalized['metadata'] ?? array() );
+		}
 	}
 
 	return $messages;
+}
+
+/**
+ * Append source-card tool envelopes for assistant message citation metadata.
+ *
+ * @param array $messages Normalized conversation messages.
+ * @param array $metadata Message metadata.
+ * @return array
+ */
+function frontend_agent_chat_append_source_card_tool_messages( array $messages, array $metadata ): array {
+	$sources = frontend_agent_chat_normalize_source_cards( $metadata );
+	if ( empty( $sources ) ) {
+		return $messages;
+	}
+
+	$tool_call_id = 'source_cards_' . count( $messages );
+	$messages[]   = array(
+		'role'     => 'assistant',
+		'content'  => '',
+		'metadata' => array(
+			'type'         => 'tool_call',
+			'tool_name'    => 'source_cards',
+			'tool_call_id' => $tool_call_id,
+			'parameters'   => array( 'sources' => $sources ),
+		),
+	);
+	$messages[]   = array(
+		'role'     => 'user',
+		'content'  => frontend_agent_chat_json_encode( array( 'sources' => $sources ) ),
+		'metadata' => array(
+			'type'         => 'tool_result',
+			'tool_name'    => 'source_cards',
+			'tool_call_id' => $tool_call_id,
+			'success'      => true,
+		),
+	);
+
+	return $messages;
+}
+
+/**
+ * Normalize generic citation/source metadata into source-card payloads.
+ *
+ * @param array $metadata Message or response metadata.
+ * @return array<int,array<string,string>>
+ */
+function frontend_agent_chat_normalize_source_cards( array $metadata ): array {
+	$raw_sources = frontend_agent_chat_find_source_card_values( $metadata );
+	$sources     = array();
+	foreach ( $raw_sources as $raw_source ) {
+		$source = frontend_agent_chat_normalize_source_card( $raw_source );
+		if ( ! empty( $source ) ) {
+			$sources[] = $source;
+		}
+	}
+
+	return $sources;
+}
+
+/**
+ * Find source-card arrays in a metadata payload.
+ *
+ * @param array $metadata Metadata payload.
+ * @return array<int,mixed>
+ */
+function frontend_agent_chat_find_source_card_values( array $metadata ): array {
+	foreach ( array( 'sources', 'citations', 'source_cards', 'sourceCards' ) as $key ) {
+		if ( isset( $metadata[ $key ] ) && is_array( $metadata[ $key ] ) ) {
+			return array_values( $metadata[ $key ] );
+		}
+	}
+
+	foreach ( array( 'source', 'citation' ) as $key ) {
+		if ( isset( $metadata[ $key ] ) ) {
+			return array( $metadata[ $key ] );
+		}
+	}
+
+	return array();
+}
+
+/**
+ * Normalize one source-card payload.
+ *
+ * @param mixed $raw_source Raw source payload.
+ * @return array<string,string>
+ */
+function frontend_agent_chat_normalize_source_card( $raw_source ): array {
+	if ( is_string( $raw_source ) ) {
+		$raw_source = array( 'url' => $raw_source );
+	}
+
+	if ( ! is_array( $raw_source ) ) {
+		return array();
+	}
+
+	$source = array();
+	foreach ( array(
+		'title'       => array( 'title', 'source_title', 'sourceTitle', 'name', 'label' ),
+		'url'         => array( 'url', 'source_url', 'sourceUrl', 'href', 'link' ),
+		'snippet'     => array( 'snippet', 'excerpt', 'summary', 'text', 'content', 'quote' ),
+		'document_id' => array( 'document_id', 'documentId', 'doc_id', 'docId', 'document', 'id' ),
+		'chunk_id'    => array( 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ),
+	) as $target_key => $source_keys ) {
+		$value = frontend_agent_chat_first_string_value( $raw_source, $source_keys );
+		if ( '' !== $value ) {
+			$source[ $target_key ] = $value;
+		}
+	}
+
+	return ( ! empty( $source['title'] ) || ! empty( $source['url'] ) || ! empty( $source['snippet'] ) ) ? $source : array();
+}
+
+/**
+ * Read the first non-empty scalar value from an array.
+ *
+ * @param array $source Source array.
+ * @param array $keys Candidate keys.
+ * @return string
+ */
+function frontend_agent_chat_first_string_value( array $source, array $keys ): string {
+	foreach ( $keys as $key ) {
+		if ( ! isset( $source[ $key ] ) || is_array( $source[ $key ] ) || is_object( $source[ $key ] ) ) {
+			continue;
+		}
+
+		$value = trim( (string) $source[ $key ] );
+		if ( '' !== $value ) {
+			return $value;
+		}
+	}
+
+	return '';
+}
+
+/**
+ * Encode JSON with WordPress escaping when available.
+ *
+ * @param mixed $value Value to encode.
+ * @return string
+ */
+function frontend_agent_chat_json_encode( $value ): string {
+	$json = function_exists( 'wp_json_encode' ) ? wp_json_encode( $value ) : json_encode( $value );
+	return is_string( $json ) ? $json : '';
 }
 
 /**

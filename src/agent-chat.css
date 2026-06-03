@@ -456,6 +456,86 @@
 	text-decoration: underline;
 }
 
+.frontend-agent-chat__source-cards {
+	margin: 8px 12px;
+	font-family: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+	color: var(--frontend-agent-chat-text-primary, #1e293b);
+}
+
+.frontend-agent-chat__source-cards-title {
+	margin: 0 0 6px;
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1.3;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.frontend-agent-chat__source-card {
+	padding: 10px 12px;
+	border: 1px solid var(--frontend-agent-chat-border-color, #e2e8f0);
+	border-radius: 12px;
+	background: var(--frontend-agent-chat-message-bg, #fff);
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.frontend-agent-chat__source-card + .frontend-agent-chat__source-card {
+	margin-top: 8px;
+}
+
+.frontend-agent-chat__source-card-heading {
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1.35;
+}
+
+.frontend-agent-chat__source-card-link {
+	color: var(--frontend-agent-chat-accent, #2563eb);
+	text-decoration: none;
+}
+
+.frontend-agent-chat__source-card-link:hover {
+	text-decoration: underline;
+}
+
+.frontend-agent-chat__source-card-title {
+	color: var(--frontend-agent-chat-text-primary, #1e293b);
+}
+
+.frontend-agent-chat__source-card-snippet {
+	margin: 6px 0 0;
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.frontend-agent-chat__source-card-debug {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 10px;
+	margin: 8px 0 0;
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+	font-family: var(--frontend-agent-chat-monospace-font-family, ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace);
+	font-size: 11px;
+	line-height: 1.35;
+}
+
+.frontend-agent-chat__source-card-debug div {
+	display: inline-flex;
+	gap: 4px;
+	min-width: 0;
+}
+
+.frontend-agent-chat__source-card-debug dt,
+.frontend-agent-chat__source-card-debug dd {
+	margin: 0;
+}
+
+.frontend-agent-chat__source-card-debug dt {
+	font-weight: 700;
+}
+
 .frontend-agent-chat__empty {
 	text-align: center;
 	padding: var(--frontend-agent-chat-spacing-lg, 24px);
