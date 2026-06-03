@@ -10,6 +10,8 @@ A small React app mounts a floating action button (FAB) in the bottom-right corn
 
 The widget is a frontend shell. Agent runtime, tools, prompt policy, pending-action resolution, access control, and conversation sessions are provided by Agents API abilities and host-registered stores.
 
+`@extrachill/chat` remains the current React UI dependency because it speaks the REST contract used by this plugin's Agents API adapter. Other Automattic chat UI packages can converge here once they support the Agents API session, run-control, pending-action, and message contracts directly.
+
 ## Configuration
 
 Each site configures the chat widget via the `frontend_agent_chat_config` option.
