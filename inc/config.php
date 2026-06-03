@@ -26,9 +26,10 @@ function frontend_agent_chat_get_config(): array {
 		'expand_icon_path'     => '',
 		'collapse_icon_path'   => '',
 		'expand_icon_view_box' => '0 0 24 24',
-		'loading_messages'     => true,
-		'message_suggestions'  => array(),
-		'layout'               => 'floating',
+		'loading_messages'      => true,
+		'message_suggestions'   => array(),
+		'retrieval_diagnostics' => false,
+		'layout'                => 'floating',
 	);
 
 	$saved = get_option( 'frontend_agent_chat_config', array() );
@@ -464,21 +465,23 @@ function frontend_agent_chat_has_ability( string $name ): bool {
  * Detect run-control support for the current frontend chat principal.
  *
  * @param string $agent_slug Optional selected agent slug.
- * @return array{chat_run_status:bool,chat_run_cancel:bool,chat_message_queue:bool,chat_run_events:bool}
+ * @return array{chat_run_status:bool,chat_run_cancel:bool,chat_message_queue:bool,chat_run_events:bool,retrieval_diagnostics:bool}
  */
 function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = '' ): array {
 	$agent_slug = sanitize_title( $agent_slug );
 	$can_chat   = true;
+	$config     = frontend_agent_chat_get_config();
 
 	if ( '' !== $agent_slug ) {
 		$can_chat = frontend_agent_chat_user_can_see( frontend_agent_chat_resolve_agent( $agent_slug ) );
 	}
 
 	$capabilities = array(
-		'chat_run_status'    => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
-		'chat_run_cancel'    => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
-		'chat_message_queue' => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
-		'chat_run_events'    => $can_chat && frontend_agent_chat_has_ability( 'agents/list-chat-run-events' ),
+		'chat_run_status'       => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
+		'chat_run_cancel'       => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
+		'chat_message_queue'    => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
+		'chat_run_events'       => $can_chat && frontend_agent_chat_has_ability( 'agents/list-chat-run-events' ),
+		'retrieval_diagnostics' => $can_chat && ! empty( $config['retrieval_diagnostics'] ),
 	);
 
 	/**
@@ -491,10 +494,11 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 	$filtered = apply_filters( 'frontend_agent_chat_run_control_capabilities', $capabilities, $agent_slug );
 
 	return is_array( $filtered ) ? array(
-		'chat_run_status'    => ! empty( $filtered['chat_run_status'] ),
-		'chat_run_cancel'    => ! empty( $filtered['chat_run_cancel'] ),
-		'chat_message_queue' => ! empty( $filtered['chat_message_queue'] ),
-		'chat_run_events'    => ! empty( $filtered['chat_run_events'] ),
+		'chat_run_status'       => ! empty( $filtered['chat_run_status'] ),
+		'chat_run_cancel'       => ! empty( $filtered['chat_run_cancel'] ),
+		'chat_message_queue'    => ! empty( $filtered['chat_message_queue'] ),
+		'chat_run_events'       => ! empty( $filtered['chat_run_events'] ),
+		'retrieval_diagnostics' => ! empty( $filtered['retrieval_diagnostics'] ),
 	) : $capabilities;
 }
 

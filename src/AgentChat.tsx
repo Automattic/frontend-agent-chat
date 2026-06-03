@@ -27,6 +27,7 @@ import {
 } from '@extrachill/chat';
 import type { ChatMessage, ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice, ChatRunCapabilities, CancelRunInput, QueueMessageInput, QueueMessageResult } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
+import { getRetrievalDiagnosticsPanel, shouldRenderRetrievalDiagnostics } from './retrieval-diagnostics';
 
 /**
  * WordPress dependencies
@@ -67,7 +68,9 @@ interface AgentChatProps {
 		chat_run_cancel?: boolean;
 		chat_message_queue?: boolean;
 		chat_run_events?: boolean;
+		retrieval_diagnostics?: boolean;
 	};
+	retrievalDiagnosticsEnabled?: boolean;
 }
 
 interface BootstrapResponse {
@@ -818,6 +821,33 @@ function renderArtifactStatusCard( group: ToolGroup ): ReactNode {
 	);
 }
 
+function renderRetrievalDiagnosticsPanel( metadata: Record< string, unknown > | null ): ReactNode {
+	if ( ! metadata ) {
+		return null;
+	}
+
+	const panel = getRetrievalDiagnosticsPanel( metadata );
+	if ( ! panel ) {
+		return null;
+	}
+
+	return createElement(
+		'details',
+		{ className: 'frontend-agent-chat__retrieval-diagnostics' },
+		createElement( 'summary', null, __( 'Retrieval diagnostics', 'frontend-agent-chat' ) ),
+		createElement(
+			'dl',
+			null,
+			panel.rows.map( ( row ) => createElement(
+				'div',
+				{ key: row.label, className: 'frontend-agent-chat__retrieval-diagnostics-row' },
+				createElement( 'dt', null, row.label ),
+				createElement( 'dd', null, row.value )
+			) )
+		)
+	);
+}
+
 function renderExpandIcon( path: string, viewBox: string ): ReactNode {
 	return createElement(
 		'svg',
@@ -881,6 +911,7 @@ export default function AgentChat( {
 	persistenceCta,
 	messageSuggestions,
 	capabilities,
+	retrievalDiagnosticsEnabled,
 }: AgentChatProps ) {
 	const isInline = layout === 'inline';
 	const [ isOpen, setIsOpen ] = useState( isInline );
@@ -888,6 +919,7 @@ export default function AgentChat( {
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] = useState( isLoggedIn );
 	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] = useState( false );
+	const [ retrievalDiagnosticsMetadata, setRetrievalDiagnosticsMetadata ] = useState< Record< string, unknown > | null >( null );
 	const [ agents, setAgents ] = useState< AgentSummary[] >( () => agentSlug ? [ {
 		slug: agentSlug,
 		name: agentName,
@@ -904,6 +936,7 @@ export default function AgentChat( {
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
 	const runCapabilities = useMemo( () => createRunCapabilities( capabilities ), [ capabilities ] );
+	const canShowRetrievalDiagnostics = !! retrievalDiagnosticsEnabled || !! capabilities?.retrieval_diagnostics;
 	const cancelRun = useMemo( () => createCancelRun( agentFetch, basePath ), [ agentFetch, basePath ] );
 	const queueMessage = useMemo( () => createQueueMessage( agentFetch, wpMediaUpload, basePath ), [ agentFetch, basePath ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
@@ -944,13 +977,18 @@ export default function AgentChat( {
 			metadata: responseMetadata,
 		} );
 		dispatchResponseMetadata( responseMetadata );
+		setRetrievalDiagnosticsMetadata(
+			shouldRenderRetrievalDiagnostics( canShowRetrievalDiagnostics, responseMetadata )
+				? responseMetadata
+				: null
+		);
 		if ( capabilities?.chat_run_events ) {
 			dispatchRunEvents( agentFetch, basePath, responseMetadata ).catch( ( err: unknown ) => {
 				// eslint-disable-next-line no-console
 				console.error( 'AgentChat: failed to fetch chat run events', err );
 			} );
 		}
-	}, [ activeAgentSlug, agentFetch, basePath, capabilities?.chat_run_events ] );
+	}, [ activeAgentSlug, agentFetch, basePath, canShowRetrievalDiagnostics, capabilities?.chat_run_events ] );
 
 	useEffect( () => {
 		if ( isInline ) {
@@ -1188,6 +1226,9 @@ export default function AgentChat( {
 					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,
+					renderHeader: () => canShowRetrievalDiagnostics
+						? renderRetrievalDiagnosticsPanel( retrievalDiagnosticsMetadata )
+						: null,
 					runCapabilities,
 					getRunId,
 					onCancelRun: cancelRun,

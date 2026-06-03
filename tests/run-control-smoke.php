@@ -139,7 +139,11 @@ function sanitize_key( $value ) {
 }
 
 function apply_filters( $hook, $value ) {
-	unset( $hook );
+	if ( 'frontend_agent_chat_run_control_capabilities' === $hook && is_callable( $GLOBALS['frontend_agent_chat_run_control_capabilities_filter'] ?? null ) ) {
+		$args = func_get_args();
+		return $GLOBALS['frontend_agent_chat_run_control_capabilities_filter']( $value, $args[2] ?? '' );
+	}
+
 	return $value;
 }
 
@@ -148,7 +152,10 @@ function register_rest_route() {}
 function add_filter() {}
 
 function get_option( $name, $default = false ) {
-	unset( $name );
+	if ( 'frontend_agent_chat_config' === $name ) {
+		return $GLOBALS['frontend_agent_chat_run_control_config'] ?? $default;
+	}
+
 	return $default;
 }
 
@@ -214,6 +221,7 @@ $GLOBALS['frontend_agent_chat_run_control_agents'] = array(
 		'description' => 'Answers user questions.',
 	),
 );
+$GLOBALS['frontend_agent_chat_run_control_config'] = array();
 $GLOBALS['frontend_agent_chat_run_control_abilities'] = array(
 	'agents/list-accessible-agents',
 	'agents/can-access-agent',
@@ -230,7 +238,21 @@ frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_sta
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_cancel'], 'cancel capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_message_queue'], 'queue capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_events'], 'events capability requires canonical ability', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( false, $capabilities['retrieval_diagnostics'], 'retrieval diagnostics are hidden by default', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( 'agents/list-accessible-agents', $GLOBALS['frontend_agent_chat_run_control_calls'][0][0] ?? '', 'capability detection checks selected agent access', $failures, $passes );
+
+$GLOBALS['frontend_agent_chat_run_control_capabilities_filter'] = static function ( array $capabilities ): array {
+	$capabilities['retrieval_diagnostics'] = true;
+	return $capabilities;
+};
+$capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['retrieval_diagnostics'], 'retrieval diagnostics can be enabled by capability filter', $failures, $passes );
+unset( $GLOBALS['frontend_agent_chat_run_control_capabilities_filter'] );
+
+$GLOBALS['frontend_agent_chat_run_control_config'] = array( 'retrieval_diagnostics' => true );
+$capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['retrieval_diagnostics'], 'retrieval diagnostics can be enabled by config', $failures, $passes );
+$GLOBALS['frontend_agent_chat_run_control_config'] = array();
 
 $run_response = frontend_agent_chat_rest_get_run( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_run_control_assert_equals( 'running', $run_response['data']['status'] ?? '', 'run status is normalized', $failures, $passes );
