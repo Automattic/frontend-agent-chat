@@ -872,10 +872,14 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
 			'role'    => 'user',
 			'content' => $user_message,
 		);
-		$messages[] = array(
+		$assistant = array(
 			'role'    => 'assistant',
 			'content' => (string) ( $result['reply'] ?? '' ),
 		);
+		if ( is_array( $result['metadata'] ?? null ) ) {
+			$assistant['metadata'] = frontend_agent_chat_normalize_citation_metadata( $result['metadata'] );
+		}
+		$messages[] = $assistant;
 	}
 
 	return $messages;
@@ -922,13 +926,217 @@ function frontend_agent_chat_session_messages( array $source ): array {
 		// attachments (user image uploads, tool-produced media) on session
 		// reload. Without this, multimodal messages would render text-only.
 		if ( isset( $message['metadata'] ) && is_array( $message['metadata'] ) ) {
-			$normalized['metadata'] = $message['metadata'];
+			$normalized['metadata'] = 'assistant' === $role
+				? frontend_agent_chat_normalize_citation_metadata( $message['metadata'] )
+				: $message['metadata'];
 		}
 
 		$messages[] = $normalized;
 	}
 
 	return $messages;
+}
+
+/**
+ * Normalize citation-like metadata into the raw message contract used by @extrachill/chat.
+ *
+ * @param array $metadata Message or response metadata.
+ * @return array
+ */
+function frontend_agent_chat_normalize_citation_metadata( array $metadata ): array {
+	$citations = frontend_agent_chat_normalize_citations( $metadata );
+	if ( ! empty( $citations ) ) {
+		$metadata['citations'] = $citations;
+	}
+
+	$sources = frontend_agent_chat_normalize_sources( $metadata );
+	if ( ! empty( $sources ) ) {
+		$metadata['sources'] = $sources;
+	}
+
+	return $metadata;
+}
+
+/**
+ * Normalize generic citation/source metadata into raw citation payloads.
+ *
+ * @param array $metadata Message or response metadata.
+ * @return array<int,array<string,mixed>>
+ */
+function frontend_agent_chat_normalize_citations( array $metadata ): array {
+	$raw_citations = frontend_agent_chat_find_citation_values( $metadata );
+	$citations     = array();
+	foreach ( $raw_citations as $index => $raw_citation ) {
+		$citation = frontend_agent_chat_normalize_citation( $raw_citation, $index + 1 );
+		if ( ! empty( $citation ) ) {
+			$citations[] = $citation;
+		}
+	}
+
+	return $citations;
+}
+
+/**
+ * Find citation-like arrays in a metadata payload.
+ *
+ * @param array $metadata Metadata payload.
+ * @return array<int,mixed>
+ */
+function frontend_agent_chat_find_citation_values( array $metadata ): array {
+	foreach ( array( 'citations', 'source_cards', 'sourceCards', 'sources' ) as $key ) {
+		if ( isset( $metadata[ $key ] ) && is_array( $metadata[ $key ] ) ) {
+			return array_values( $metadata[ $key ] );
+		}
+	}
+
+	foreach ( array( 'citation', 'source' ) as $key ) {
+		if ( isset( $metadata[ $key ] ) ) {
+			return array( $metadata[ $key ] );
+		}
+	}
+
+	return array();
+}
+
+/**
+ * Normalize source records for citations that reference sources by id.
+ *
+ * @param array $metadata Message or response metadata.
+ * @return array<int,array<string,mixed>>
+ */
+function frontend_agent_chat_normalize_sources( array $metadata ): array {
+	if ( empty( $metadata['sources'] ) || ! is_array( $metadata['sources'] ) ) {
+		return array();
+	}
+
+	$sources = array();
+	foreach ( $metadata['sources'] as $raw_source ) {
+		$source = frontend_agent_chat_normalize_source( $raw_source );
+		if ( ! empty( $source ) ) {
+			$sources[] = $source;
+		}
+	}
+
+	return $sources;
+}
+
+/**
+ * Normalize one raw citation payload.
+ *
+ * @param mixed $raw_citation Raw citation payload.
+ * @param int   $fallback_index One-based fallback index.
+ * @return array<string,mixed>
+ */
+function frontend_agent_chat_normalize_citation( $raw_citation, int $fallback_index ): array {
+	if ( is_string( $raw_citation ) ) {
+		$raw_citation = array( 'url' => $raw_citation );
+	}
+
+	if ( ! is_array( $raw_citation ) ) {
+		return array();
+	}
+
+	$citation = array( 'index' => $fallback_index );
+	foreach ( array(
+		'id'        => array( 'id', 'citation_id', 'citationId' ),
+		'source_id' => array( 'source_id', 'sourceId' ),
+		'title'     => array( 'title', 'source_title', 'sourceTitle', 'name', 'label' ),
+		'url'       => array( 'url', 'source_url', 'sourceUrl', 'href', 'link' ),
+		'label'     => array( 'label', 'container', 'provider' ),
+		'snippet'   => array( 'snippet', 'excerpt', 'summary', 'text', 'content', 'quote' ),
+		'quote'     => array( 'quote' ),
+	) as $target_key => $source_keys ) {
+		$value = frontend_agent_chat_first_string_value( $raw_citation, $source_keys );
+		if ( '' !== $value ) {
+			$citation[ $target_key ] = $value;
+		}
+	}
+
+	$metadata = frontend_agent_chat_source_reference_metadata( $raw_citation );
+	if ( ! empty( $metadata ) ) {
+		$citation['metadata'] = $metadata;
+	}
+
+	return ( ! empty( $citation['source_id'] ) || ! empty( $citation['title'] ) || ! empty( $citation['url'] ) || ! empty( $citation['snippet'] ) || ! empty( $citation['quote'] ) ) ? $citation : array();
+}
+
+/**
+ * Normalize one raw source payload.
+ *
+ * @param mixed $raw_source Raw source payload.
+ * @return array<string,mixed>
+ */
+function frontend_agent_chat_normalize_source( $raw_source ): array {
+	if ( is_string( $raw_source ) ) {
+		$raw_source = array( 'url' => $raw_source );
+	}
+
+	if ( ! is_array( $raw_source ) ) {
+		return array();
+	}
+
+	$source = array();
+	foreach ( array(
+		'id'    => array( 'id', 'source_id', 'sourceId', 'document_id', 'documentId', 'doc_id', 'docId' ),
+		'title' => array( 'title', 'source_title', 'sourceTitle', 'name' ),
+		'url'   => array( 'url', 'source_url', 'sourceUrl', 'href', 'link' ),
+		'label' => array( 'label', 'container', 'provider' ),
+	) as $target_key => $source_keys ) {
+		$value = frontend_agent_chat_first_string_value( $raw_source, $source_keys );
+		if ( '' !== $value ) {
+			$source[ $target_key ] = $value;
+		}
+	}
+
+	$metadata = frontend_agent_chat_source_reference_metadata( $raw_source );
+	if ( ! empty( $metadata ) ) {
+		$source['metadata'] = $metadata;
+	}
+
+	return $source;
+}
+
+/**
+ * Normalize source-specific ids that are not part of the shared citation contract.
+ *
+ * @param array $source Source/citation array.
+ * @return array<string,string>
+ */
+function frontend_agent_chat_source_reference_metadata( array $source ): array {
+	$metadata = array();
+	foreach ( array(
+		'item_id'     => array( 'item_id', 'itemId', 'document_id', 'documentId', 'doc_id', 'docId', 'document' ),
+		'fragment_id' => array( 'fragment_id', 'fragmentId', 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ),
+	) as $target_key => $source_keys ) {
+		$value = frontend_agent_chat_first_string_value( $source, $source_keys );
+		if ( '' !== $value ) {
+			$metadata[ $target_key ] = $value;
+		}
+	}
+
+	return $metadata;
+}
+
+/**
+ * Read the first non-empty scalar value from an array.
+ *
+ * @param array $source Source array.
+ * @param array $keys Candidate keys.
+ * @return string
+ */
+function frontend_agent_chat_first_string_value( array $source, array $keys ): string {
+	foreach ( $keys as $key ) {
+		if ( ! isset( $source[ $key ] ) || is_array( $source[ $key ] ) || is_object( $source[ $key ] ) ) {
+			continue;
+		}
+
+		$value = trim( (string) $source[ $key ] );
+		if ( '' !== $value ) {
+			return $value;
+		}
+	}
+
+	return '';
 }
 
 /**
