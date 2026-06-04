@@ -238,20 +238,20 @@ frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_sta
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_cancel'], 'cancel capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_message_queue'], 'queue capability requires canonical ability', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( true, $capabilities['chat_run_events'], 'events capability requires canonical ability', $failures, $passes );
-frontend_agent_chat_run_control_assert_equals( false, $capabilities['retrieval_diagnostics'], 'retrieval diagnostics are hidden by default', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( false, $capabilities['operator_diagnostics'], 'operator diagnostics are hidden by default', $failures, $passes );
 frontend_agent_chat_run_control_assert_equals( 'agents/list-accessible-agents', $GLOBALS['frontend_agent_chat_run_control_calls'][0][0] ?? '', 'capability detection checks selected agent access', $failures, $passes );
 
 $GLOBALS['frontend_agent_chat_run_control_capabilities_filter'] = static function ( array $capabilities ): array {
-	$capabilities['retrieval_diagnostics'] = true;
+	$capabilities['operator_diagnostics'] = true;
 	return $capabilities;
 };
 $capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
-frontend_agent_chat_run_control_assert_equals( true, $capabilities['retrieval_diagnostics'], 'retrieval diagnostics can be enabled by capability filter', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['operator_diagnostics'], 'operator diagnostics can be enabled by capability filter', $failures, $passes );
 unset( $GLOBALS['frontend_agent_chat_run_control_capabilities_filter'] );
 
-$GLOBALS['frontend_agent_chat_run_control_config'] = array( 'retrieval_diagnostics' => true );
+$GLOBALS['frontend_agent_chat_run_control_config'] = array( 'operator_diagnostics' => true );
 $capabilities = frontend_agent_chat_get_run_control_capabilities( 'demo-agent' );
-frontend_agent_chat_run_control_assert_equals( true, $capabilities['retrieval_diagnostics'], 'retrieval diagnostics can be enabled by config', $failures, $passes );
+frontend_agent_chat_run_control_assert_equals( true, $capabilities['operator_diagnostics'], 'operator diagnostics can be enabled by config', $failures, $passes );
 $GLOBALS['frontend_agent_chat_run_control_config'] = array();
 
 $run_response = frontend_agent_chat_rest_get_run( new WP_REST_Request( array( 'run_id' => 'run-1', 'session_id' => 'session-1', 'agent' => 'demo-agent' ) ) );

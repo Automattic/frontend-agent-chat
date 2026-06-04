@@ -5,7 +5,7 @@
 	"private": true,
 	"scripts": {
 		"build": "wp-scripts build",
-		"test:diagnostics": "node --no-warnings --experimental-strip-types tests/retrieval-diagnostics-smoke.ts",
+		"test:diagnostics": "node --no-warnings --experimental-strip-types tests/operator-diagnostics-smoke.ts",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
