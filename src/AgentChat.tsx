@@ -25,20 +25,40 @@ import {
 	createQuestionToolRenderer,
 	normalizeRunEvent,
 } from '@extrachill/chat';
-import type { ArtifactStatus, ArtifactStatusPayload, ChatMessage, ChatMessageSuggestion, ChatRunAdapter, ChatRunCapabilities, ChatRunEvent, FetchFn, MediaUploadFn, QueueMessageResult } from '@extrachill/chat';
+import type {
+	ArtifactStatus,
+	ArtifactStatusPayload,
+	ChatMessage,
+	ChatMessageSuggestion,
+	ChatRunAdapter,
+	ChatRunCapabilities,
+	ChatRunEvent,
+	FetchFn,
+	MediaUploadFn,
+	QueueMessageResult,
+} from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
-import { getOperatorDiagnosticsPanel, shouldRenderOperatorDiagnostics } from './operator-diagnostics';
 
 /**
  * WordPress dependencies
  */
-import { createElement, useState, useCallback, useMemo, useEffect } from '@wordpress/element';
+import {
+	createElement,
+	useState,
+	useCallback,
+	useMemo,
+	useEffect,
+} from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 
 /**
  * Internal dependencies
  */
+import {
+	getOperatorDiagnosticsPanel,
+	shouldRenderOperatorDiagnostics,
+} from './operator-diagnostics';
 import { getRetrievalState } from './retrieval-state';
 import type { RetrievalState } from './retrieval-state';
 
@@ -58,11 +78,13 @@ interface AgentChatProps {
 	expandIconViewBox?: string;
 	layout?: 'floating' | 'inline';
 	isLoggedIn?: boolean;
-	loadingMessages?: boolean | {
-		mode?: 'default' | 'extend' | 'override';
-		messages?: string[];
-		interval?: number;
-	};
+	loadingMessages?:
+		| boolean
+		| {
+				mode?: 'default' | 'extend' | 'override';
+				messages?: string[];
+				interval?: number;
+		  };
 	persistenceCta?: {
 		message?: string;
 		actionLabel?: string;
@@ -86,7 +108,7 @@ interface BootstrapResponse {
 		browser_principal_ready?: boolean;
 		had_browser_principal?: boolean;
 		session_persistence_scope?: 'user' | 'browser';
-		capabilities?: AgentChatProps['capabilities'];
+		capabilities?: AgentChatProps[ 'capabilities' ];
 	};
 }
 
@@ -116,16 +138,27 @@ interface RunEventsResponse {
 	};
 }
 
-async function bootstrapBrowserPrincipal( bootstrapPath: string ): Promise< boolean > {
-	const response = await apiFetch( { path: bootstrapPath, method: 'POST' } ) as BootstrapResponse;
+async function bootstrapBrowserPrincipal(
+	bootstrapPath: string
+): Promise< boolean > {
+	const response = ( await apiFetch( {
+		path: bootstrapPath,
+		method: 'POST',
+	} ) ) as BootstrapResponse;
 	const data = response.data ?? {};
 	if ( data.authenticated || data.had_browser_principal ) {
 		return data.browser_principal_ready !== false;
 	}
 
-	const verificationResponse = await apiFetch( { path: bootstrapPath, method: 'POST' } ) as BootstrapResponse;
+	const verificationResponse = ( await apiFetch( {
+		path: bootstrapPath,
+		method: 'POST',
+	} ) ) as BootstrapResponse;
 	const verificationData = verificationResponse.data ?? {};
-	return verificationData.browser_principal_ready !== false && verificationData.had_browser_principal === true;
+	return (
+		verificationData.browser_principal_ready !== false &&
+		verificationData.had_browser_principal === true
+	);
 }
 
 interface AgentSummary {
@@ -156,14 +189,21 @@ const DEFAULT_COLLAPSE_ICON_PATH = 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5';
  * @param actionId Pending action ID.
  * @param decision Resolution decision.
  */
-function resolvePendingAction( actionId: string, decision: 'accepted' | 'rejected' ): void {
+function resolvePendingAction(
+	actionId: string,
+	decision: 'accepted' | 'rejected'
+): void {
 	apiFetch( {
 		path: '/frontend-agent-chat/v1/chat/actions/resolve',
 		method: 'POST',
 		data: { action_id: actionId, decision },
 	} ).catch( ( err: unknown ) => {
 		// eslint-disable-next-line no-console
-		console.error( 'AgentChat: failed to resolve pending action', actionId, err );
+		console.error(
+			'AgentChat: failed to resolve pending action',
+			actionId,
+			err
+		);
 	} );
 }
 
@@ -197,24 +237,33 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 	return ( options ) => {
 		const method = options.method ?? 'GET';
 		const separator = options.path.includes( '?' ) ? '&' : '?';
-		const data = options.data && typeof options.data === 'object' && ! Array.isArray( options.data )
-			? options.data as Record< string, unknown >
-			: {};
+		const data =
+			options.data &&
+			typeof options.data === 'object' &&
+			! Array.isArray( options.data )
+				? ( options.data as Record< string, unknown > )
+				: {};
 
 		return apiFetch( {
-			path: method === 'GET' || method === 'DELETE'
-				? `${ options.path }${ separator }agent=${ encodeURIComponent( agentSlug ) }`
-				: options.path,
+			path:
+				method === 'GET' || method === 'DELETE'
+					? `${
+							options.path
+					  }${ separator }agent=${ encodeURIComponent( agentSlug ) }`
+					: options.path,
 			method: options.method,
-			data: method === 'POST'
-				? { ...getPageContext(), ...data, agent: agentSlug }
-				: options.data,
+			data:
+				method === 'POST'
+					? { ...getPageContext(), ...data, agent: agentSlug }
+					: options.data,
 			headers: options.headers,
 		} );
 	};
 }
 
-function createRunCapabilities( capabilities?: AgentChatProps['capabilities'] ): ChatRunCapabilities {
+function createRunCapabilities(
+	capabilities?: AgentChatProps[ 'capabilities' ]
+): ChatRunCapabilities {
 	return {
 		cancel: !! capabilities?.chat_run_cancel,
 		queue: !! capabilities?.chat_message_queue,
@@ -228,13 +277,15 @@ function getRunId( metadata: Record< string, unknown > ): string | null {
 	return typeof runId === 'string' && runId.trim() ? runId : null;
 }
 
-function normalizeQueueResult( response: RunControlResponse ): QueueMessageResult {
+function normalizeQueueResult(
+	response: RunControlResponse
+): QueueMessageResult {
 	const data = response.data ?? {};
 	return {
 		queuedMessageId: data.queued_message_id,
 		runId: data.run_id,
 		sessionId: data.session_id,
-		status: data.status as QueueMessageResult['status'],
+		status: data.status as QueueMessageResult[ 'status' ],
 		startedAt: data.started_at,
 		updatedAt: data.updated_at,
 		metadata: data.metadata,
@@ -246,32 +297,36 @@ function createFrontendRunAdapter(
 	fetchFn: FetchFn,
 	uploadFn: MediaUploadFn,
 	basePath: string,
-	capabilities?: AgentChatProps['capabilities']
+	capabilities?: AgentChatProps[ 'capabilities' ]
 ): ChatRunAdapter {
 	return {
 		capabilities: createRunCapabilities( capabilities ),
 		getRunId,
 		async cancel( input ) {
 			await fetchFn( {
-				path: `${ basePath }/runs/${ encodeURIComponent( input.runId ) }/cancel`,
+				path: `${ basePath }/runs/${ encodeURIComponent(
+					input.runId
+				) }/cancel`,
 				method: 'POST',
 				data: { session_id: input.sessionId },
 			} );
 		},
 		async queue( input ) {
 			const attachments = input.files?.length
-				? await Promise.all( input.files.map( async ( file ) => {
-					const uploaded = await uploadFn( file );
-					return {
-						filename: file.name,
-						mime_type: file.type,
-						url: uploaded.url,
-						media_id: uploaded.media_id,
-					};
-				} ) )
+				? await Promise.all(
+						input.files.map( async ( file ) => {
+							const uploaded = await uploadFn( file );
+							return {
+								filename: file.name,
+								mime_type: file.type,
+								url: uploaded.url,
+								media_id: uploaded.media_id,
+							};
+						} )
+				  )
 				: [];
 
-			const response = await fetchFn( {
+			const response = ( await fetchFn( {
 				path: `${ basePath }/queue`,
 				method: 'POST',
 				data: {
@@ -280,7 +335,7 @@ function createFrontendRunAdapter(
 					message: input.content,
 					attachments,
 				},
-			} ) as RunControlResponse;
+			} ) ) as RunControlResponse;
 
 			return normalizeQueueResult( response );
 		},
@@ -289,13 +344,22 @@ function createFrontendRunAdapter(
 			let hasMore = true;
 			const events: ChatRunEvent[] = [];
 			while ( hasMore ) {
-				const response = await fetchFn( {
-					path: `${ basePath }/runs/${ encodeURIComponent( input.runId ) }/events?session_id=${ encodeURIComponent( input.sessionId ) }&cursor=${ encodeURIComponent( cursor ) }`,
-				} ) as RunEventsResponse;
+				const response = ( await fetchFn( {
+					path: `${ basePath }/runs/${ encodeURIComponent(
+						input.runId
+					) }/events?session_id=${ encodeURIComponent(
+						input.sessionId
+					) }&cursor=${ encodeURIComponent( cursor ) }`,
+				} ) ) as RunEventsResponse;
 				const data = response.data ?? {};
 				for ( const event of data.events ?? [] ) {
 					const normalized = normalizeRunEvent(
-						{ ...event, run_id: input.runId, session_id: input.sessionId, status: data.status },
+						{
+							...event,
+							run_id: input.runId,
+							session_id: input.sessionId,
+							status: data.status,
+						},
 						input.runId
 					);
 					if ( normalized ) {
@@ -320,7 +384,11 @@ function persistActiveAgent( agentSlug: string ): void {
 		data: { agent: agentSlug },
 	} ).catch( ( err: unknown ) => {
 		// eslint-disable-next-line no-console
-		console.error( 'AgentChat: failed to persist active agent', agentSlug, err );
+		console.error(
+			'AgentChat: failed to persist active agent',
+			agentSlug,
+			err
+		);
 	} );
 }
 
@@ -332,7 +400,10 @@ function dispatchResponseMetadata( metadata: Record< string, unknown > ): void {
 	);
 }
 
-function dispatchLifecycleEvent( phase: string, detail: Record< string, unknown > = {} ): void {
+function dispatchLifecycleEvent(
+	phase: string,
+	detail: Record< string, unknown > = {}
+): void {
 	window.dispatchEvent(
 		new CustomEvent( 'frontend-agent-chat:lifecycle', {
 			detail: {
@@ -343,7 +414,10 @@ function dispatchLifecycleEvent( phase: string, detail: Record< string, unknown 
 	);
 }
 
-function dispatchRunEvent( event: ChatRunEvent, detail: Record< string, unknown > = {} ): void {
+function dispatchRunEvent(
+	event: ChatRunEvent,
+	detail: Record< string, unknown > = {}
+): void {
 	window.dispatchEvent(
 		new CustomEvent( 'frontend-agent-chat:run-event', {
 			detail: {
@@ -358,10 +432,19 @@ function dispatchRunEvent( event: ChatRunEvent, detail: Record< string, unknown 
 	} );
 }
 
-async function dispatchRunEvents( runAdapter: ChatRunAdapter, metadata: Record< string, unknown > ): Promise< void > {
+async function dispatchRunEvents(
+	runAdapter: ChatRunAdapter,
+	metadata: Record< string, unknown >
+): Promise< void > {
 	const runId = metadata.run_id ?? metadata.runId;
 	const sessionId = metadata.session_id ?? metadata.sessionId;
-	if ( ! runAdapter.listEvents || typeof runId !== 'string' || ! runId || typeof sessionId !== 'string' || ! sessionId ) {
+	if (
+		! runAdapter.listEvents ||
+		typeof runId !== 'string' ||
+		! runId ||
+		typeof sessionId !== 'string' ||
+		! sessionId
+	) {
 		return;
 	}
 
@@ -388,11 +471,11 @@ const wpMediaUpload: MediaUploadFn = async ( file: File ) => {
 	const formData = new FormData();
 	formData.append( 'file', file );
 
-	const media = await apiFetch( {
+	const media = ( await apiFetch( {
 		path: '/wp/v2/media',
 		method: 'POST',
 		body: formData,
-	} ) as { id: number; source_url: string };
+	} ) ) as { id: number; source_url: string };
 
 	return {
 		url: media.source_url,
@@ -424,13 +507,22 @@ function artifactStatusCopy( payload: ArtifactStatusPayload ): string {
 
 	switch ( payload.status ) {
 		case 'pending':
-			return __( 'Waiting to start this artifact phase.', 'frontend-agent-chat' );
+			return __(
+				'Waiting to start this artifact phase.',
+				'frontend-agent-chat'
+			);
 		case 'running':
-			return __( 'This artifact phase is in progress.', 'frontend-agent-chat' );
+			return __(
+				'This artifact phase is in progress.',
+				'frontend-agent-chat'
+			);
 		case 'ready':
 			return __( 'This artifact phase is ready.', 'frontend-agent-chat' );
 		case 'completed':
-			return __( 'This artifact phase completed successfully.', 'frontend-agent-chat' );
+			return __(
+				'This artifact phase completed successfully.',
+				'frontend-agent-chat'
+			);
 		case 'failed':
 			return __( 'This artifact phase failed.', 'frontend-agent-chat' );
 		case 'retrying':
@@ -438,7 +530,9 @@ function artifactStatusCopy( payload: ArtifactStatusPayload ): string {
 	}
 }
 
-function renderArtifactStatusPayload( payload: ArtifactStatusPayload ): ReactNode {
+function renderArtifactStatusPayload(
+	payload: ArtifactStatusPayload
+): ReactNode {
 	const hasError = payload.status === 'failed';
 	const linkUrl = payload.resultUrl ?? payload.previewUrl;
 	const linkLabel = payload.resultUrl
@@ -447,59 +541,101 @@ function renderArtifactStatusPayload( payload: ArtifactStatusPayload ): ReactNod
 
 	return createElement(
 		'div',
-		{ className: `frontend-agent-chat__tool-card frontend-agent-chat__artifact-card is-${ payload.status }${ hasError ? ' has-error' : '' }` },
+		{
+			className: `frontend-agent-chat__tool-card frontend-agent-chat__artifact-card is-${
+				payload.status
+			}${ hasError ? ' has-error' : '' }`,
+		},
 		createElement(
 			'div',
 			{ className: 'frontend-agent-chat__artifact-card-header' },
-			createElement( 'div', null,
-				createElement( 'div', { className: 'frontend-agent-chat__tool-card-title' }, payload.title ),
-				createElement( 'div', { className: 'frontend-agent-chat__artifact-card-phase' }, payload.phase )
+			createElement(
+				'div',
+				null,
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__tool-card-title' },
+					payload.title
+				),
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__artifact-card-phase' },
+					payload.phase
+				)
 			),
-			createElement( 'span', { className: 'frontend-agent-chat__artifact-card-status' }, artifactStatusLabel( payload.status ) )
+			createElement(
+				'span',
+				{ className: 'frontend-agent-chat__artifact-card-status' },
+				artifactStatusLabel( payload.status )
+			)
 		),
 		createElement(
 			'p',
 			{ className: 'frontend-agent-chat__tool-card-copy' },
 			artifactStatusCopy( payload )
 		),
-		payload.thumbnails.length > 0 && createElement(
-			'div',
-			{ className: 'frontend-agent-chat__artifact-card-thumbnails', 'aria-label': __( 'Imported assets', 'frontend-agent-chat' ) },
-			payload.thumbnails.map( ( thumbnail, index ) => createElement( 'img', {
-				key: `${ thumbnail.url }-${ index }`,
-				src: thumbnail.url,
-				alt: thumbnail.alt ?? '',
-				loading: 'lazy',
-			} ) )
-		),
-		( payload.diagnosticsCount !== undefined || linkUrl ) && createElement(
-			'div',
-			{ className: 'frontend-agent-chat__artifact-card-meta' },
-			payload.diagnosticsCount !== undefined && createElement(
-				'span',
-				{ className: 'frontend-agent-chat__artifact-card-meta-item' },
-				sprintf(
-					/* translators: %d: number of diagnostics. */
-					__( '%d diagnostics', 'frontend-agent-chat' ),
-					payload.diagnosticsCount
+		payload.thumbnails.length > 0 &&
+			createElement(
+				'div',
+				{
+					className: 'frontend-agent-chat__artifact-card-thumbnails',
+					'aria-label': __(
+						'Imported assets',
+						'frontend-agent-chat'
+					),
+				},
+				payload.thumbnails.map( ( thumbnail, index ) =>
+					createElement( 'img', {
+						key: `${ thumbnail.url }-${ index }`,
+						src: thumbnail.url,
+						alt: thumbnail.alt ?? '',
+						loading: 'lazy',
+					} )
 				)
 			),
-			linkUrl && createElement(
-				'a',
-				{
-					className: 'frontend-agent-chat__artifact-card-link',
-					href: linkUrl,
-					target: '_blank',
-					rel: 'noreferrer',
-				},
-				linkLabel
+		( payload.diagnosticsCount !== undefined || linkUrl ) &&
+			createElement(
+				'div',
+				{ className: 'frontend-agent-chat__artifact-card-meta' },
+				payload.diagnosticsCount !== undefined &&
+					createElement(
+						'span',
+						{
+							className:
+								'frontend-agent-chat__artifact-card-meta-item',
+						},
+						sprintf(
+							/* translators: %d: number of diagnostics. */
+							__( '%d diagnostics', 'frontend-agent-chat' ),
+							payload.diagnosticsCount
+						)
+					),
+				linkUrl &&
+					createElement(
+						'a',
+						{
+							className:
+								'frontend-agent-chat__artifact-card-link',
+							href: linkUrl,
+							target: '_blank',
+							rel: 'noreferrer',
+						},
+						linkLabel
+					)
+			),
+		hasError &&
+			payload.error &&
+			createElement(
+				'p',
+				{ className: 'frontend-agent-chat__tool-card-error' },
+				payload.error
 			)
-		),
-		hasError && payload.error && createElement( 'p', { className: 'frontend-agent-chat__tool-card-error' }, payload.error )
 	);
 }
 
-function renderOperatorDiagnosticsPanel( metadata: Record< string, unknown > | null ): ReactNode {
+function renderOperatorDiagnosticsPanel(
+	metadata: Record< string, unknown > | null
+): ReactNode {
 	if ( ! metadata ) {
 		return null;
 	}
@@ -516,12 +652,18 @@ function renderOperatorDiagnosticsPanel( metadata: Record< string, unknown > | n
 		createElement(
 			'dl',
 			null,
-			panel.rows.map( ( row ) => createElement(
-				'div',
-				{ key: row.label, className: 'frontend-agent-chat__operator-diagnostics-row' },
-				createElement( 'dt', null, row.label ),
-				createElement( 'dd', null, row.value )
-			) )
+			panel.rows.map( ( row ) =>
+				createElement(
+					'div',
+					{
+						key: row.label,
+						className:
+							'frontend-agent-chat__operator-diagnostics-row',
+					},
+					createElement( 'dt', null, row.label ),
+					createElement( 'dd', null, row.value )
+				)
+			)
 		)
 	);
 }
@@ -548,7 +690,11 @@ function renderExpandIcon( path: string, viewBox: string ): ReactNode {
 	);
 }
 
-function renderFabIcon( icon: string, path: string, viewBox: string ): ReactNode {
+function renderFabIcon(
+	icon: string,
+	path: string,
+	viewBox: string
+): ReactNode {
 	if ( path ) {
 		return createElement(
 			'svg',
@@ -565,7 +711,14 @@ function renderFabIcon( icon: string, path: string, viewBox: string ): ReactNode
 	}
 
 	return '' !== icon
-		? createElement( 'span', { className: 'frontend-agent-chat__fab-icon', 'aria-hidden': true }, icon )
+		? createElement(
+				'span',
+				{
+					className: 'frontend-agent-chat__fab-icon',
+					'aria-hidden': true,
+				},
+				icon
+		  )
 		: null;
 }
 
@@ -577,11 +730,22 @@ function renderRetrievalState( state: RetrievalState | null ): ReactNode {
 	return createElement(
 		'div',
 		{
-			className: `frontend-agent-chat__retrieval-state is-${ state.kind.replace( '_', '-' ) }`,
+			className: `frontend-agent-chat__retrieval-state is-${ state.kind.replace(
+				'_',
+				'-'
+			) }`,
 			role: state.kind === 'error' ? 'status' : undefined,
 		},
-		createElement( 'span', { className: 'frontend-agent-chat__retrieval-state-label' }, state.label ),
-		createElement( 'span', { className: 'frontend-agent-chat__retrieval-state-description' }, state.description )
+		createElement(
+			'span',
+			{ className: 'frontend-agent-chat__retrieval-state-label' },
+			state.label
+		),
+		createElement(
+			'span',
+			{ className: 'frontend-agent-chat__retrieval-state-description' },
+			state.description
+		)
 	);
 }
 
@@ -611,26 +775,52 @@ export default function AgentChat( {
 	const [ isOpen, setIsOpen ] = useState( isInline );
 	const [ isExpanded, setIsExpanded ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
-	const [ browserBootstrapReady, setBrowserBootstrapReady ] = useState( isLoggedIn );
-	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] = useState( false );
-	const [ operatorDiagnosticsMetadata, setOperatorDiagnosticsMetadata ] = useState< Record< string, unknown > | null >( null );
-	const [ retrievalState, setRetrievalState ] = useState< RetrievalState | null >( null );
-	const [ agents, setAgents ] = useState< AgentSummary[] >( () => agentSlug ? [ {
-		slug: agentSlug,
-		name: agentName,
-		description: agentDescription,
-	} ] : [] );
-	const [ selectedAgentSlug, setSelectedAgentSlug ] = useState( agentSlug ?? '' );
+	const [ browserBootstrapReady, setBrowserBootstrapReady ] =
+		useState( isLoggedIn );
+	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] =
+		useState( false );
+	const [ operatorDiagnosticsMetadata, setOperatorDiagnosticsMetadata ] =
+		useState< Record< string, unknown > | null >( null );
+	const [ retrievalState, setRetrievalState ] =
+		useState< RetrievalState | null >( null );
+	const [ agents, setAgents ] = useState< AgentSummary[] >( () =>
+		agentSlug
+			? [
+					{
+						slug: agentSlug,
+						name: agentName,
+						description: agentDescription,
+					},
+			  ]
+			: []
+	);
+	const [ selectedAgentSlug, setSelectedAgentSlug ] = useState(
+		agentSlug ?? ''
+	);
 	const selectedAgent = useMemo(
 		() => agents.find( ( agent ) => agent.slug === selectedAgentSlug ),
 		[ agents, selectedAgentSlug ]
 	);
 	const activeAgentSlug = selectedAgent?.slug ?? '';
 	const activeAgentName = selectedAgent?.name ?? agentName;
-	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
-	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
-	const canShowOperatorDiagnostics = !! operatorDiagnosticsEnabled || !! capabilities?.operator_diagnostics;
-	const runAdapter = useMemo( () => createFrontendRunAdapter( agentFetch, wpMediaUpload, basePath, capabilities ), [ agentFetch, basePath, capabilities ] );
+	const activeAgentDescription =
+		selectedAgent?.description ?? agentDescription;
+	const agentFetch = useMemo(
+		() => createAgentFetch( activeAgentSlug ),
+		[ activeAgentSlug ]
+	);
+	const canShowOperatorDiagnostics =
+		!! operatorDiagnosticsEnabled || !! capabilities?.operator_diagnostics;
+	const runAdapter = useMemo(
+		() =>
+			createFrontendRunAdapter(
+				agentFetch,
+				wpMediaUpload,
+				basePath,
+				capabilities
+			),
+		[ agentFetch, basePath, capabilities ]
+	);
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {
 		if ( isInline ) {
@@ -640,50 +830,78 @@ export default function AgentChat( {
 		setIsOpen( false );
 		setIsExpanded( false );
 	}, [ isInline ] );
-	const toggleExpanded = useCallback( () => setIsExpanded( ( expanded ) => ! expanded ), [] );
-	const switchAgent = useCallback( ( event: ChangeEvent< HTMLSelectElement > ) => {
-		const nextAgentSlug = event.target.value;
-		setSelectedAgentSlug( nextAgentSlug );
-		persistActiveAgent( nextAgentSlug );
-	}, [] );
-	const handleMessage = useCallback( ( message: ChatMessage ) => {
-		if ( message.role !== 'user' ) {
-			return;
-		}
+	const toggleExpanded = useCallback(
+		() => setIsExpanded( ( expanded ) => ! expanded ),
+		[]
+	);
+	const switchAgent = useCallback(
+		( event: ChangeEvent< HTMLSelectElement > ) => {
+			const nextAgentSlug = event.target.value;
+			setSelectedAgentSlug( nextAgentSlug );
+			persistActiveAgent( nextAgentSlug );
+		},
+		[]
+	);
+	const handleMessage = useCallback(
+		( message: ChatMessage ) => {
+			if ( message.role !== 'user' ) {
+				return;
+			}
 
-		setRetrievalState( null );
+			setRetrievalState( null );
 
-		dispatchLifecycleEvent( 'message-submitted', {
-			agent: activeAgentSlug,
-			message_id: message.id,
-			has_attachments: !! message.attachments?.length,
-		} );
-	}, [ activeAgentSlug ] );
-	const handleError = useCallback( ( error: Error ) => {
-		dispatchLifecycleEvent( 'error', {
-			agent: activeAgentSlug,
-			message: error.message,
-		} );
-	}, [ activeAgentSlug ] );
-	const handleResponseMetadata = useCallback( ( responseMetadata: Record< string, unknown > ) => {
-		setRetrievalState( getRetrievalState( responseMetadata ) );
-		dispatchLifecycleEvent( 'response-metadata', {
-			agent: activeAgentSlug,
-			metadata: responseMetadata,
-		} );
-		dispatchResponseMetadata( responseMetadata );
-		setOperatorDiagnosticsMetadata(
-			shouldRenderOperatorDiagnostics( canShowOperatorDiagnostics, responseMetadata )
-				? responseMetadata
-				: null
-		);
-		if ( capabilities?.chat_run_events ) {
-			dispatchRunEvents( runAdapter, responseMetadata ).catch( ( err: unknown ) => {
-				// eslint-disable-next-line no-console
-				console.error( 'AgentChat: failed to fetch chat run events', err );
+			dispatchLifecycleEvent( 'message-submitted', {
+				agent: activeAgentSlug,
+				message_id: message.id,
+				has_attachments: !! message.attachments?.length,
 			} );
-		}
-	}, [ activeAgentSlug, canShowOperatorDiagnostics, capabilities?.chat_run_events, runAdapter ] );
+		},
+		[ activeAgentSlug ]
+	);
+	const handleError = useCallback(
+		( error: Error ) => {
+			dispatchLifecycleEvent( 'error', {
+				agent: activeAgentSlug,
+				message: error.message,
+			} );
+		},
+		[ activeAgentSlug ]
+	);
+	const handleResponseMetadata = useCallback(
+		( responseMetadata: Record< string, unknown > ) => {
+			setRetrievalState( getRetrievalState( responseMetadata ) );
+			dispatchLifecycleEvent( 'response-metadata', {
+				agent: activeAgentSlug,
+				metadata: responseMetadata,
+			} );
+			dispatchResponseMetadata( responseMetadata );
+			setOperatorDiagnosticsMetadata(
+				shouldRenderOperatorDiagnostics(
+					canShowOperatorDiagnostics,
+					responseMetadata
+				)
+					? responseMetadata
+					: null
+			);
+			if ( capabilities?.chat_run_events ) {
+				dispatchRunEvents( runAdapter, responseMetadata ).catch(
+					( err: unknown ) => {
+						// eslint-disable-next-line no-console
+						console.error(
+							'AgentChat: failed to fetch chat run events',
+							err
+						);
+					}
+				);
+			}
+		},
+		[
+			activeAgentSlug,
+			canShowOperatorDiagnostics,
+			capabilities?.chat_run_events,
+			runAdapter,
+		]
+	);
 
 	useEffect( () => {
 		if ( isInline ) {
@@ -707,7 +925,10 @@ export default function AgentChat( {
 				setBrowserBootstrapReady( false );
 				setBrowserBootstrapFailed( true );
 				// eslint-disable-next-line no-console
-				console.error( 'AgentChat: failed to bootstrap browser chat storage', err );
+				console.error(
+					'AgentChat: failed to bootstrap browser chat storage',
+					err
+				);
 			} );
 	}, [ bootstrapPath, isLoggedIn ] );
 
@@ -722,26 +943,42 @@ export default function AgentChat( {
 
 				setAgents( nextAgents );
 				setSelectedAgentSlug( ( current ) => {
-					if ( current && nextAgents.some( ( agent ) => agent.slug === current ) ) {
+					if (
+						current &&
+						nextAgents.some( ( agent ) => agent.slug === current )
+					) {
 						return current;
 					}
 
 					const defaultAgentSlug = data.default_agent_slug ?? '';
-					if ( defaultAgentSlug && nextAgents.some( ( agent ) => agent.slug === defaultAgentSlug ) ) {
+					if (
+						defaultAgentSlug &&
+						nextAgents.some(
+							( agent ) => agent.slug === defaultAgentSlug
+						)
+					) {
 						return defaultAgentSlug;
 					}
 
 					const preferredAgentSlug = data.active_agent_slug ?? '';
-					if ( preferredAgentSlug && nextAgents.some( ( agent ) => agent.slug === preferredAgentSlug ) ) {
+					if (
+						preferredAgentSlug &&
+						nextAgents.some(
+							( agent ) => agent.slug === preferredAgentSlug
+						)
+					) {
 						return preferredAgentSlug;
 					}
 
-					return nextAgents[0].slug;
+					return nextAgents[ 0 ].slug;
 				} );
 			} )
 			.catch( ( err: unknown ) => {
 				// eslint-disable-next-line no-console
-				console.error( 'AgentChat: failed to load accessible agents', err );
+				console.error(
+					'AgentChat: failed to load accessible agents',
+					err
+				);
 			} );
 	}, [ agentsPath ] );
 
@@ -768,32 +1005,31 @@ export default function AgentChat( {
 		return () => document.removeEventListener( 'keydown', handleKeyDown );
 	}, [ isExpanded, isInline, isOpen ] );
 
-	const toolRenderers = useMemo(
-		() => {
-			const artifactRenderer = createArtifactStatusToolRenderer( {
-				render: ( payload ) => renderArtifactStatusPayload( payload ),
-				fallback: ( group ) => createElement( ToolMessage, { group } ),
-			} );
-			const diffRenderer = createPendingActionDiffRenderer( {
-				onAccept: ( actionId: string ) => resolvePendingAction( actionId, 'accepted' ),
-				onReject: ( actionId: string ) => resolvePendingAction( actionId, 'rejected' ),
-			} );
-			const questionRenderer = createQuestionToolRenderer();
+	const toolRenderers = useMemo( () => {
+		const artifactRenderer = createArtifactStatusToolRenderer( {
+			render: ( payload ) => renderArtifactStatusPayload( payload ),
+			fallback: ( group ) => createElement( ToolMessage, { group } ),
+		} );
+		const diffRenderer = createPendingActionDiffRenderer( {
+			onAccept: ( actionId: string ) =>
+				resolvePendingAction( actionId, 'accepted' ),
+			onReject: ( actionId: string ) =>
+				resolvePendingAction( actionId, 'rejected' ),
+		} );
+		const questionRenderer = createQuestionToolRenderer();
 
-			return {
-				artifact_phase: artifactRenderer,
-				start_artifact_generation: artifactRenderer,
-				artifact_status: artifactRenderer,
-				artifact_status_update: artifactRenderer,
-				artifact_task_status: artifactRenderer,
-				edit_post_blocks: diffRenderer,
-				replace_post_blocks: diffRenderer,
-				insert_content: diffRenderer,
-				present_question: questionRenderer,
-			};
-		},
-		[]
-	);
+		return {
+			artifact_phase: artifactRenderer,
+			start_artifact_generation: artifactRenderer,
+			artifact_status: artifactRenderer,
+			artifact_status_update: artifactRenderer,
+			artifact_task_status: artifactRenderer,
+			edit_post_blocks: diffRenderer,
+			replace_post_blocks: diffRenderer,
+			insert_content: diffRenderer,
+			present_question: questionRenderer,
+		};
+	}, [] );
 	const renderChatHeader = useCallback( () => {
 		const retrievalStateNode = renderRetrievalState( retrievalState );
 		const operatorDiagnosticsNode = canShowOperatorDiagnostics
@@ -810,77 +1046,107 @@ export default function AgentChat( {
 			retrievalStateNode,
 			operatorDiagnosticsNode
 		);
-	}, [ canShowOperatorDiagnostics, operatorDiagnosticsMetadata, retrievalState ] );
+	}, [
+		canShowOperatorDiagnostics,
+		operatorDiagnosticsMetadata,
+		retrievalState,
+	] );
 	const hasPersistenceCta = !! (
 		persistenceCta?.message ||
 		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
 	);
 	const persistenceMessage = browserBootstrapFailed
-		? __( 'Chat works, but this browser is blocking secure chat-history cookies.', 'frontend-agent-chat' )
+		? __(
+				'Chat works, but this browser is blocking secure chat-history cookies.',
+				'frontend-agent-chat'
+		  )
 		: persistenceCta?.message;
 	const chatStorageReady = isLoggedIn || browserBootstrapReady;
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
 		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
 	const expandButtonIconPath = isExpanded
-		? ( collapseIconPath || DEFAULT_COLLAPSE_ICON_PATH )
-		: ( expandIconPath || DEFAULT_EXPAND_ICON_PATH );
+		? collapseIconPath || DEFAULT_COLLAPSE_ICON_PATH
+		: expandIconPath || DEFAULT_EXPAND_ICON_PATH;
 
 	return createElement(
 		'div',
 		{ className: `frontend-agent-chat is-${ layout }` },
-		! isInline && createElement(
-			'button',
-			{
-				type: 'button',
-				className: `frontend-agent-chat__fab${ isOpen ? ' is-hidden' : '' }`,
-				onClick: open,
-				'aria-label': sprintf(
-					/* translators: %s: agent name. */
-					__( 'Open %s chat', 'frontend-agent-chat' ),
-					activeAgentName
-				),
-			},
-			renderFabIcon( fabIcon, fabIconPath, fabIconViewBox ),
-			createElement( 'span', { className: 'frontend-agent-chat__fab-label' }, fabLabel ),
-			unreadCount > 0 &&
+		! isInline &&
+			createElement(
+				'button',
+				{
+					type: 'button',
+					className: `frontend-agent-chat__fab${
+						isOpen ? ' is-hidden' : ''
+					}`,
+					onClick: open,
+					'aria-label': sprintf(
+						/* translators: %s: agent name. */
+						__( 'Open %s chat', 'frontend-agent-chat' ),
+						activeAgentName
+					),
+				},
+				renderFabIcon( fabIcon, fabIconPath, fabIconViewBox ),
 				createElement(
 					'span',
-					{ className: 'frontend-agent-chat__fab-badge' },
-					unreadCount > 99 ? '99+' : unreadCount
-				)
-		),
+					{ className: 'frontend-agent-chat__fab-label' },
+					fabLabel
+				),
+				unreadCount > 0 &&
+					createElement(
+						'span',
+						{ className: 'frontend-agent-chat__fab-badge' },
+						unreadCount > 99 ? '99+' : unreadCount
+					)
+			),
 		createElement(
 			'div',
 			{
-				className: `frontend-agent-chat__drawer${ isOpen ? ' is-open' : '' }${ isExpanded ? ' is-expanded' : '' }${ isInline ? ' is-inline' : '' }`,
+				className: `frontend-agent-chat__drawer${
+					isOpen ? ' is-open' : ''
+				}${ isExpanded ? ' is-expanded' : '' }${
+					isInline ? ' is-inline' : ''
+				}`,
 				'aria-hidden': ! isOpen,
 			},
 			createElement(
 				'div',
 				{ className: 'frontend-agent-chat__header' },
-				! isInline && createElement(
-					'div',
-					{ className: 'frontend-agent-chat__agent' },
-					agents.length > 1 ? createElement(
-						'select',
-						{
-							className: 'frontend-agent-chat__agent-select',
-							value: activeAgentSlug,
-							onChange: switchAgent,
-							'aria-label': __( 'Select chat agent', 'frontend-agent-chat' ),
-						},
-						agents.map( ( agent ) => createElement(
-							'option',
-							{ key: agent.slug, value: agent.slug },
-							agent.name
-						) )
-					) : createElement(
-						'span',
-						{ className: 'frontend-agent-chat__title' },
-						activeAgentName
-					)
-				),
+				! isInline &&
+					createElement(
+						'div',
+						{ className: 'frontend-agent-chat__agent' },
+						agents.length > 1
+							? createElement(
+									'select',
+									{
+										className:
+											'frontend-agent-chat__agent-select',
+										value: activeAgentSlug,
+										onChange: switchAgent,
+										'aria-label': __(
+											'Select chat agent',
+											'frontend-agent-chat'
+										),
+									},
+									agents.map( ( agent ) =>
+										createElement(
+											'option',
+											{
+												key: agent.slug,
+												value: agent.slug,
+											},
+											agent.name
+										)
+									)
+							  )
+							: createElement(
+									'span',
+									{ className: 'frontend-agent-chat__title' },
+									activeAgentName
+							  )
+					),
 				createElement(
 					'div',
 					{ className: 'frontend-agent-chat__header-actions' },
@@ -893,7 +1159,10 @@ export default function AgentChat( {
 							'aria-label': expandedButtonLabel,
 							'aria-pressed': isExpanded,
 						},
-						renderExpandIcon( expandButtonIconPath, expandIconViewBox )
+						renderExpandIcon(
+							expandButtonIconPath,
+							expandIconViewBox
+						)
 					),
 					createElement(
 						'button',
@@ -910,58 +1179,76 @@ export default function AgentChat( {
 			createElement(
 				'div',
 				{ className: 'frontend-agent-chat__body' },
-				! isLoggedIn && ( browserBootstrapFailed || hasPersistenceCta ) && createElement(
-					'div',
-					{ className: `frontend-agent-chat__persistence${ browserBootstrapFailed ? ' has-warning' : '' }` },
-					persistenceMessage,
-					! browserBootstrapFailed && persistenceCta?.actionUrl && persistenceCta?.actionLabel && createElement(
-						'a',
-						{
-							className: 'frontend-agent-chat__persistence-action',
-							href: persistenceCta.actionUrl,
-						},
-						persistenceCta.actionLabel
-					)
-				),
-				activeAgentSlug && chatStorageReady && createElement( Chat, {
-					key: activeAgentSlug,
-					basePath,
-					fetchFn: agentFetch,
-					showTools: true,
-					showSessions: true,
-					toolRenderers,
-					placeholder: sprintf(
-						/* translators: %s: agent name. */
-						__( 'Ask %s anything…', 'frontend-agent-chat' ),
-						activeAgentName
-					),
-					clientContext: true,
-					clientContextOptions: { metadataKey: 'client_context' },
-					onMessage: handleMessage,
-					onError: handleError,
-					onResponseMetadata: handleResponseMetadata,
-					isVisible: isOpen,
-					onUnreadChange: setUnreadCount,
-					emptyState: createElement(
+				! isLoggedIn &&
+					( browserBootstrapFailed || hasPersistenceCta ) &&
+					createElement(
 						'div',
-						{ className: 'frontend-agent-chat__empty' },
-						createElement( 'h3', null, activeAgentName ),
-						createElement( 'p', null, activeAgentDescription )
+						{
+							className: `frontend-agent-chat__persistence${
+								browserBootstrapFailed ? ' has-warning' : ''
+							}`,
+						},
+						persistenceMessage,
+						! browserBootstrapFailed &&
+							persistenceCta?.actionUrl &&
+							persistenceCta?.actionLabel &&
+							createElement(
+								'a',
+								{
+									className:
+										'frontend-agent-chat__persistence-action',
+									href: persistenceCta.actionUrl,
+								},
+								persistenceCta.actionLabel
+							)
 					),
-					messageSuggestions,
-					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
-					loadingMessages,
-					mediaUploadFn: wpMediaUpload,
-					renderHeader: renderChatHeader,
-					runAdapter,
-					cancelLabel: __( 'Stop', 'frontend-agent-chat' ),
-					processingLabel: ( turnCount: number ) =>
-						sprintf(
-							/* translators: %d: processing turn count. */
-							__( 'Working… (turn %d)', 'frontend-agent-chat' ),
-							turnCount
+				activeAgentSlug &&
+					chatStorageReady &&
+					createElement( Chat, {
+						key: activeAgentSlug,
+						basePath,
+						fetchFn: agentFetch,
+						showTools: true,
+						showSessions: true,
+						toolRenderers,
+						placeholder: sprintf(
+							/* translators: %s: agent name. */
+							__( 'Ask %s anything…', 'frontend-agent-chat' ),
+							activeAgentName
 						),
-				} )
+						clientContext: true,
+						clientContextOptions: { metadataKey: 'client_context' },
+						onMessage: handleMessage,
+						onError: handleError,
+						onResponseMetadata: handleResponseMetadata,
+						isVisible: isOpen,
+						onUnreadChange: setUnreadCount,
+						emptyState: createElement(
+							'div',
+							{ className: 'frontend-agent-chat__empty' },
+							createElement( 'h3', null, activeAgentName ),
+							createElement( 'p', null, activeAgentDescription )
+						),
+						messageSuggestions,
+						messageSuggestionsLabel: __(
+							'Try asking',
+							'frontend-agent-chat'
+						),
+						loadingMessages,
+						mediaUploadFn: wpMediaUpload,
+						renderHeader: renderChatHeader,
+						runAdapter,
+						cancelLabel: __( 'Stop', 'frontend-agent-chat' ),
+						processingLabel: ( turnCount: number ) =>
+							sprintf(
+								/* translators: %d: processing turn count. */
+								__(
+									'Working… (turn %d)',
+									'frontend-agent-chat'
+								),
+								turnCount
+							),
+					} )
 			)
 		)
 	);

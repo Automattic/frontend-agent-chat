@@ -872,7 +872,7 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
 			'role'    => 'user',
 			'content' => $user_message,
 		);
-		$assistant = array(
+		$assistant  = array(
 			'role'    => 'assistant',
 			'content' => (string) ( $result['reply'] ?? '' ),
 		);

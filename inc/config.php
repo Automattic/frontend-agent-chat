@@ -26,10 +26,10 @@ function frontend_agent_chat_get_config(): array {
 		'expand_icon_path'     => '',
 		'collapse_icon_path'   => '',
 		'expand_icon_view_box' => '0 0 24 24',
-		'loading_messages'      => true,
-		'message_suggestions'   => array(),
-		'operator_diagnostics'  => false,
-		'layout'                => 'floating',
+		'loading_messages'     => true,
+		'message_suggestions'  => array(),
+		'operator_diagnostics' => false,
+		'layout'               => 'floating',
 	);
 
 	$saved = get_option( 'frontend_agent_chat_config', array() );
@@ -477,11 +477,11 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 	}
 
 	$capabilities = array(
-		'chat_run_status'       => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
-		'chat_run_cancel'       => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
-		'chat_message_queue'    => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
-		'chat_run_events'       => $can_chat && frontend_agent_chat_has_ability( 'agents/list-chat-run-events' ),
-		'operator_diagnostics'  => $can_chat && ! empty( $config['operator_diagnostics'] ),
+		'chat_run_status'      => $can_chat && frontend_agent_chat_has_ability( 'agents/get-chat-run' ),
+		'chat_run_cancel'      => $can_chat && frontend_agent_chat_has_ability( 'agents/cancel-chat-run' ),
+		'chat_message_queue'   => $can_chat && frontend_agent_chat_has_ability( 'agents/queue-chat-message' ),
+		'chat_run_events'      => $can_chat && frontend_agent_chat_has_ability( 'agents/list-chat-run-events' ),
+		'operator_diagnostics' => $can_chat && ! empty( $config['operator_diagnostics'] ),
 	);
 
 	/**
@@ -494,11 +494,11 @@ function frontend_agent_chat_get_run_control_capabilities( string $agent_slug = 
 	$filtered = apply_filters( 'frontend_agent_chat_run_control_capabilities', $capabilities, $agent_slug );
 
 	return is_array( $filtered ) ? array(
-		'chat_run_status'       => ! empty( $filtered['chat_run_status'] ),
-		'chat_run_cancel'       => ! empty( $filtered['chat_run_cancel'] ),
-		'chat_message_queue'    => ! empty( $filtered['chat_message_queue'] ),
-		'chat_run_events'       => ! empty( $filtered['chat_run_events'] ),
-		'operator_diagnostics'  => ! empty( $filtered['operator_diagnostics'] ),
+		'chat_run_status'      => ! empty( $filtered['chat_run_status'] ),
+		'chat_run_cancel'      => ! empty( $filtered['chat_run_cancel'] ),
+		'chat_message_queue'   => ! empty( $filtered['chat_message_queue'] ),
+		'chat_run_events'      => ! empty( $filtered['chat_run_events'] ),
+		'operator_diagnostics' => ! empty( $filtered['operator_diagnostics'] ),
 	) : $capabilities;
 }
 
