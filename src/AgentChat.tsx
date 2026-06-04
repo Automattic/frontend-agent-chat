@@ -27,6 +27,7 @@ import {
 } from '@extrachill/chat';
 import type { ArtifactStatus, ArtifactStatusPayload, ChatMessage, ChatMessageSuggestion, ChatRunAdapter, ChatRunCapabilities, ChatRunEvent, FetchFn, MediaUploadFn, QueueMessageResult } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
+import { getRetrievalDiagnosticsPanel, shouldRenderRetrievalDiagnostics } from './retrieval-diagnostics';
 
 /**
  * WordPress dependencies
@@ -67,7 +68,9 @@ interface AgentChatProps {
 		chat_run_cancel?: boolean;
 		chat_message_queue?: boolean;
 		chat_run_events?: boolean;
+		retrieval_diagnostics?: boolean;
 	};
+	retrievalDiagnosticsEnabled?: boolean;
 }
 
 interface BootstrapResponse {
@@ -490,6 +493,33 @@ function renderArtifactStatusPayload( payload: ArtifactStatusPayload ): ReactNod
 	);
 }
 
+function renderRetrievalDiagnosticsPanel( metadata: Record< string, unknown > | null ): ReactNode {
+	if ( ! metadata ) {
+		return null;
+	}
+
+	const panel = getRetrievalDiagnosticsPanel( metadata );
+	if ( ! panel ) {
+		return null;
+	}
+
+	return createElement(
+		'details',
+		{ className: 'frontend-agent-chat__retrieval-diagnostics' },
+		createElement( 'summary', null, __( 'Retrieval diagnostics', 'frontend-agent-chat' ) ),
+		createElement(
+			'dl',
+			null,
+			panel.rows.map( ( row ) => createElement(
+				'div',
+				{ key: row.label, className: 'frontend-agent-chat__retrieval-diagnostics-row' },
+				createElement( 'dt', null, row.label ),
+				createElement( 'dd', null, row.value )
+			) )
+		)
+	);
+}
+
 function renderExpandIcon( path: string, viewBox: string ): ReactNode {
 	return createElement(
 		'svg',
@@ -553,6 +583,7 @@ export default function AgentChat( {
 	persistenceCta,
 	messageSuggestions,
 	capabilities,
+	retrievalDiagnosticsEnabled,
 }: AgentChatProps ) {
 	const isInline = layout === 'inline';
 	const [ isOpen, setIsOpen ] = useState( isInline );
@@ -560,6 +591,7 @@ export default function AgentChat( {
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] = useState( isLoggedIn );
 	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] = useState( false );
+	const [ retrievalDiagnosticsMetadata, setRetrievalDiagnosticsMetadata ] = useState< Record< string, unknown > | null >( null );
 	const [ agents, setAgents ] = useState< AgentSummary[] >( () => agentSlug ? [ {
 		slug: agentSlug,
 		name: agentName,
@@ -574,6 +606,7 @@ export default function AgentChat( {
 	const activeAgentName = selectedAgent?.name ?? agentName;
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
+	const canShowRetrievalDiagnostics = !! retrievalDiagnosticsEnabled || !! capabilities?.retrieval_diagnostics;
 	const runAdapter = useMemo( () => createFrontendRunAdapter( agentFetch, wpMediaUpload, basePath, capabilities ), [ agentFetch, basePath, capabilities ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {
@@ -613,13 +646,18 @@ export default function AgentChat( {
 			metadata: responseMetadata,
 		} );
 		dispatchResponseMetadata( responseMetadata );
+		setRetrievalDiagnosticsMetadata(
+			shouldRenderRetrievalDiagnostics( canShowRetrievalDiagnostics, responseMetadata )
+				? responseMetadata
+				: null
+		);
 		if ( capabilities?.chat_run_events ) {
 			dispatchRunEvents( runAdapter, responseMetadata ).catch( ( err: unknown ) => {
 				// eslint-disable-next-line no-console
 				console.error( 'AgentChat: failed to fetch chat run events', err );
 			} );
 		}
-	}, [ activeAgentSlug, capabilities?.chat_run_events, runAdapter ] );
+	}, [ activeAgentSlug, canShowRetrievalDiagnostics, capabilities?.chat_run_events, runAdapter ] );
 
 	useEffect( () => {
 		if ( isInline ) {
@@ -870,6 +908,9 @@ export default function AgentChat( {
 					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,
+					renderHeader: () => canShowRetrievalDiagnostics
+						? renderRetrievalDiagnosticsPanel( retrievalDiagnosticsMetadata )
+						: null,
 					runAdapter,
 					cancelLabel: __( 'Stop', 'frontend-agent-chat' ),
 					processingLabel: ( turnCount: number ) =>
