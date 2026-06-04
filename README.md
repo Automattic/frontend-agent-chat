@@ -2,11 +2,15 @@
 
 Floating agent chat widget for WordPress. Connects to canonical abilities from [Agents API](https://github.com/Automattic/agents-api) and stays independent from any concrete runtime or storage plugin.
 
+This plugin is the frontend companion for Agents API-powered WordPress agents. It was originally incubated as Data Machine Frontend Chat, then renamed and decoupled as the Agents API contract became the shared runtime boundary.
+
 ## How it works
 
 A small React app mounts a floating action button (FAB) in the bottom-right corner of every page. Click it and a slide-in drawer opens with a full chat interface powered by the [`@extrachill/chat`](https://www.npmjs.com/package/@extrachill/chat) package.
 
 The widget is a frontend shell. Agent runtime, tools, prompt policy, pending-action resolution, access control, and conversation sessions are provided by Agents API abilities and host-registered stores.
+
+`@extrachill/chat` remains the current React UI dependency because it speaks the REST contract used by this plugin's Agents API adapter. Other Automattic chat UI packages can converge here once they support the Agents API session, run-control, pending-action, and message contracts directly.
 
 ## Configuration
 
