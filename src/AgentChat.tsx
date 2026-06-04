@@ -19,13 +19,13 @@
  */
 import {
 	Chat,
-	DiffCard,
-	QuestionCard,
 	ToolMessage,
-	useClientContextMetadata,
-	parseCanonicalDiffFromToolGroup,
+	createArtifactStatusToolRenderer,
+	createPendingActionDiffRenderer,
+	createQuestionToolRenderer,
+	normalizeRunEvent,
 } from '@extrachill/chat';
-import type { ChatMessage, ChatMessageSuggestion, ToolGroup, DiffData, FetchFn, MediaUploadFn, ToolRendererContext, QuestionChoice, ChatRunCapabilities, CancelRunInput, QueueMessageInput, QueueMessageResult } from '@extrachill/chat';
+import type { ArtifactStatus, ArtifactStatusPayload, ChatMessage, ChatMessageSuggestion, ChatRunAdapter, ChatRunCapabilities, ChatRunEvent, FetchFn, MediaUploadFn, QueueMessageResult } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
 
 /**
@@ -95,21 +95,13 @@ interface RunControlResponse {
 	};
 }
 
-interface ChatRunEvent {
-	id: string;
-	type: string;
-	message?: string;
-	created_at?: string;
-	metadata?: Record< string, unknown >;
-}
-
 interface RunEventsResponse {
 	success?: boolean;
 	data?: {
 		run_id?: string;
 		session_id?: string;
 		status?: string;
-		events?: ChatRunEvent[];
+		events?: Record< string, unknown >[];
 		cursor?: string;
 		has_more?: boolean;
 	};
@@ -142,40 +134,8 @@ interface AgentsResponse {
 	};
 }
 
-type ArtifactPhaseStatus = 'pending' | 'running' | 'ready' | 'completed' | 'failed' | 'retrying';
-
-interface ArtifactThumbnail {
-	url: string;
-	alt?: string;
-}
-
-interface ArtifactStatusPayload {
-	title: string;
-	phase: string;
-	status: ArtifactPhaseStatus;
-	description?: string;
-	diagnosticsCount?: number;
-	previewUrl?: string;
-	materializedUrl?: string;
-	thumbnails: ArtifactThumbnail[];
-	error?: string;
-}
-
 const DEFAULT_EXPAND_ICON_PATH = 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
 const DEFAULT_COLLAPSE_ICON_PATH = 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5';
-
-/**
- * Parse a tool result into DiffData for DiffCard rendering.
- *
- * Returns null if the tool result is not a preview action (e.g. the
- * tool was called without preview=true, or the result is malformed).
- *
- * @param group Tool group.
- * @return Diff data when present.
- */
-function parseDiffFromToolResult( group: ToolGroup ): DiffData | null {
-	return parseCanonicalDiffFromToolGroup( group );
-}
 
 /**
  * Resolve a pending action by id.
@@ -228,6 +188,9 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 	return ( options ) => {
 		const method = options.method ?? 'GET';
 		const separator = options.path.includes( '?' ) ? '&' : '?';
+		const data = options.data && typeof options.data === 'object' && ! Array.isArray( options.data )
+			? options.data as Record< string, unknown >
+			: {};
 
 		return apiFetch( {
 			path: method === 'GET' || method === 'DELETE'
@@ -235,7 +198,7 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 				: options.path,
 			method: options.method,
 			data: method === 'POST'
-				? { ...getPageContext(), ...( options.data ?? {} ), agent: agentSlug }
+				? { ...getPageContext(), ...data, agent: agentSlug }
 				: options.data,
 			headers: options.headers,
 		} );
@@ -246,22 +209,14 @@ function createRunCapabilities( capabilities?: AgentChatProps['capabilities'] ):
 	return {
 		cancel: !! capabilities?.chat_run_cancel,
 		queue: !! capabilities?.chat_message_queue,
+		status: !! capabilities?.chat_run_status,
+		events: !! capabilities?.chat_run_events,
 	};
 }
 
 function getRunId( metadata: Record< string, unknown > ): string | null {
 	const runId = metadata.run_id ?? metadata.runId;
 	return typeof runId === 'string' && runId.trim() ? runId : null;
-}
-
-function createCancelRun( fetchFn: FetchFn, basePath: string ): ( input: CancelRunInput ) => Promise< void > {
-	return async ( input ) => {
-		await fetchFn( {
-			path: `${ basePath }/runs/${ encodeURIComponent( input.runId ) }/cancel`,
-			method: 'POST',
-			data: { session_id: input.sessionId },
-		} );
-	};
 }
 
 function normalizeQueueResult( response: RunControlResponse ): QueueMessageResult {
@@ -278,32 +233,74 @@ function normalizeQueueResult( response: RunControlResponse ): QueueMessageResul
 	};
 }
 
-function createQueueMessage( fetchFn: FetchFn, uploadFn: MediaUploadFn, basePath: string ): ( input: QueueMessageInput ) => Promise< QueueMessageResult > {
-	return async ( input ) => {
-		const attachments = input.files?.length
-			? await Promise.all( input.files.map( async ( file ) => {
-				const uploaded = await uploadFn( file );
-				return {
-					filename: file.name,
-					mime_type: file.type,
-					url: uploaded.url,
-					media_id: uploaded.media_id,
-				};
-			} ) )
-			: [];
+function createFrontendRunAdapter(
+	fetchFn: FetchFn,
+	uploadFn: MediaUploadFn,
+	basePath: string,
+	capabilities?: AgentChatProps['capabilities']
+): ChatRunAdapter {
+	return {
+		capabilities: createRunCapabilities( capabilities ),
+		getRunId,
+		async cancel( input ) {
+			await fetchFn( {
+				path: `${ basePath }/runs/${ encodeURIComponent( input.runId ) }/cancel`,
+				method: 'POST',
+				data: { session_id: input.sessionId },
+			} );
+		},
+		async queue( input ) {
+			const attachments = input.files?.length
+				? await Promise.all( input.files.map( async ( file ) => {
+					const uploaded = await uploadFn( file );
+					return {
+						filename: file.name,
+						mime_type: file.type,
+						url: uploaded.url,
+						media_id: uploaded.media_id,
+					};
+				} ) )
+				: [];
 
-		const response = await fetchFn( {
-			path: `${ basePath }/queue`,
-			method: 'POST',
-			data: {
-				session_id: input.sessionId,
-				run_id: input.runId,
-				message: input.content,
-				attachments,
-			},
-		} ) as RunControlResponse;
+			const response = await fetchFn( {
+				path: `${ basePath }/queue`,
+				method: 'POST',
+				data: {
+					session_id: input.sessionId,
+					run_id: input.runId,
+					message: input.content,
+					attachments,
+				},
+			} ) as RunControlResponse;
 
-		return normalizeQueueResult( response );
+			return normalizeQueueResult( response );
+		},
+		async listEvents( input ) {
+			let cursor = '0';
+			let hasMore = true;
+			const events: ChatRunEvent[] = [];
+			while ( hasMore ) {
+				const response = await fetchFn( {
+					path: `${ basePath }/runs/${ encodeURIComponent( input.runId ) }/events?session_id=${ encodeURIComponent( input.sessionId ) }&cursor=${ encodeURIComponent( cursor ) }`,
+				} ) as RunEventsResponse;
+				const data = response.data ?? {};
+				for ( const event of data.events ?? [] ) {
+					const normalized = normalizeRunEvent(
+						{ ...event, run_id: input.runId, session_id: input.sessionId, status: data.status },
+						input.runId
+					);
+					if ( normalized ) {
+						events.push( normalized );
+					}
+				}
+
+				const nextCursor = data.cursor ?? cursor;
+				hasMore = !! data.has_more && nextCursor !== cursor;
+				cursor = nextCursor;
+			}
+
+			return events;
+		},
 	};
 }
 
@@ -352,32 +349,20 @@ function dispatchRunEvent( event: ChatRunEvent, detail: Record< string, unknown 
 	} );
 }
 
-async function dispatchRunEvents( fetchFn: FetchFn, basePath: string, metadata: Record< string, unknown > ): Promise< void > {
+async function dispatchRunEvents( runAdapter: ChatRunAdapter, metadata: Record< string, unknown > ): Promise< void > {
 	const runId = metadata.run_id ?? metadata.runId;
 	const sessionId = metadata.session_id ?? metadata.sessionId;
-	if ( typeof runId !== 'string' || ! runId || typeof sessionId !== 'string' || ! sessionId ) {
+	if ( ! runAdapter.listEvents || typeof runId !== 'string' || ! runId || typeof sessionId !== 'string' || ! sessionId ) {
 		return;
 	}
 
-	let cursor = '0';
-	let hasMore = true;
-	while ( hasMore ) {
-		const separator = `${ basePath }/runs/${ encodeURIComponent( runId ) }/events`.includes( '?' ) ? '&' : '?';
-		const response = await fetchFn( {
-			path: `${ basePath }/runs/${ encodeURIComponent( runId ) }/events${ separator }session_id=${ encodeURIComponent( sessionId ) }&cursor=${ encodeURIComponent( cursor ) }`,
-		} ) as RunEventsResponse;
-		const data = response.data ?? {};
-		for ( const event of data.events ?? [] ) {
-			dispatchRunEvent( event, {
-				run_id: runId,
-				session_id: sessionId,
-				status: data.status,
-			} );
-		}
-
-		const nextCursor = data.cursor ?? cursor;
-		hasMore = !! data.has_more && nextCursor !== cursor;
-		cursor = nextCursor;
+	const events = await runAdapter.listEvents( { runId, sessionId } );
+	for ( const event of events ) {
+		dispatchRunEvent( event, {
+			run_id: runId,
+			session_id: sessionId,
+			status: event.status,
+		} );
 	}
 }
 
@@ -406,315 +391,7 @@ const wpMediaUpload: MediaUploadFn = async ( file: File ) => {
 	};
 };
 
-function renderDiffCard( group: ToolGroup ): ReactNode {
-	const diff = parseDiffFromToolResult( group );
-	if ( ! diff ) {
-		return null;
-	}
-
-	return createElement( DiffCard, {
-		diff,
-		onAccept: ( actionId: string ) => resolvePendingAction( actionId, 'accepted' ),
-		onReject: ( actionId: string ) => resolvePendingAction( actionId, 'rejected' ),
-	} );
-}
-
-interface QuestionPayload {
-	question?: string;
-	choices?: QuestionChoice[];
-	allow_freeform?: boolean;
-	freeform_label?: string;
-	freeform_placeholder?: string;
-}
-
-function parseJsonObject( value: string ): Record< string, unknown > | null {
-	try {
-		const parsed = JSON.parse( value );
-		return parsed && typeof parsed === 'object' && ! Array.isArray( parsed )
-			? parsed as Record< string, unknown >
-			: null;
-	} catch {
-		return null;
-	}
-}
-
-function asRecord( value: unknown ): Record< string, unknown > | null {
-	return value && typeof value === 'object' && ! Array.isArray( value )
-		? value as Record< string, unknown >
-		: null;
-}
-
-function readString( source: Record< string, unknown >, keys: string[] ): string | undefined {
-	for ( const key of keys ) {
-		const value = source[ key ];
-		if ( typeof value === 'string' && value.trim() ) {
-			return value.trim();
-		}
-	}
-
-	return undefined;
-}
-
-function readNumber( source: Record< string, unknown >, keys: string[] ): number | undefined {
-	for ( const key of keys ) {
-		const value = source[ key ];
-		if ( typeof value === 'number' && Number.isFinite( value ) ) {
-			return value;
-		}
-	}
-
-	return undefined;
-}
-
-function titleFromPhase( phase: string ): string {
-	return phase
-		.replace( /[-_]+/g, ' ' )
-		.replace( /\b\w/g, ( match ) => match.toUpperCase() );
-}
-
-function normalizeArtifactStatus( status: unknown ): ArtifactPhaseStatus | null {
-	if ( typeof status !== 'string' ) {
-		return null;
-	}
-
-	const normalized = status.trim().toLowerCase();
-	if ( [ 'pending', 'running', 'ready', 'completed', 'failed', 'retrying' ].includes( normalized ) ) {
-		return normalized as ArtifactPhaseStatus;
-	}
-
-	return null;
-}
-
-function firstNestedRecord( source: Record< string, unknown >, keys: string[] ): Record< string, unknown > | null {
-	for ( const key of keys ) {
-		const record = asRecord( source[ key ] );
-		if ( record ) {
-			return record;
-		}
-	}
-
-	return null;
-}
-
-function unwrapArtifactSource( source: Record< string, unknown > ): Record< string, unknown > {
-	return firstNestedRecord( source, [ 'artifact_phase', 'artifactPhase', 'phase_metadata', 'phaseMetadata', 'artifact_status', 'artifactStatus' ] ) ?? source;
-}
-
-function collectArtifactSources( group: ToolGroup ): Record< string, unknown >[] {
-	const sources: Record< string, unknown >[] = [ group.parameters ];
-	const result = group.resultMessage ? parseJsonObject( group.resultMessage.content ) : null;
-	if ( result ) {
-		sources.push( result );
-		const nestedResult = asRecord( result.result );
-		if ( nestedResult ) {
-			sources.push( nestedResult );
-		}
-		const nestedData = asRecord( result.data );
-		if ( nestedData ) {
-			sources.push( nestedData );
-		}
-	}
-
-	return sources.map( unwrapArtifactSource );
-}
-
-function getArtifactSourceValue( sources: Record< string, unknown >[], keys: string[] ): unknown {
-	for ( const source of sources ) {
-		for ( const key of keys ) {
-			if ( source[ key ] !== undefined && source[ key ] !== null ) {
-				return source[ key ];
-			}
-		}
-	}
-
-	return undefined;
-}
-
-function readArtifactString( sources: Record< string, unknown >[], keys: string[] ): string | undefined {
-	for ( const source of sources ) {
-		const value = readString( source, keys );
-		if ( value ) {
-			return value;
-		}
-	}
-
-	return undefined;
-}
-
-function readArtifactNumber( sources: Record< string, unknown >[], keys: string[] ): number | undefined {
-	for ( const source of sources ) {
-		const value = readNumber( source, keys );
-		if ( value !== undefined ) {
-			return value;
-		}
-	}
-
-	return undefined;
-}
-
-function normalizeThumbnail( value: unknown ): ArtifactThumbnail | null {
-	if ( typeof value === 'string' && value.trim() ) {
-		return { url: value.trim() };
-	}
-
-	const record = asRecord( value );
-	if ( ! record ) {
-		return null;
-	}
-
-	const url = readString( record, [ 'thumbnail_url', 'thumbnailUrl', 'thumb_url', 'thumbUrl', 'url', 'src' ] );
-	if ( ! url ) {
-		return null;
-	}
-
-	return {
-		url,
-		alt: readString( record, [ 'alt', 'alt_text', 'altText', 'label', 'title' ] ),
-	};
-}
-
-function collectArtifactThumbnails( sources: Record< string, unknown >[] ): ArtifactThumbnail[] {
-	const thumbnails: ArtifactThumbnail[] = [];
-	const thumbnailValue = getArtifactSourceValue( sources, [ 'thumbnails', 'thumbnail_urls', 'thumbnailUrls', 'assets', 'imported_assets', 'importedAssets' ] );
-	let rawThumbnails: unknown[] = [];
-	if ( Array.isArray( thumbnailValue ) ) {
-		rawThumbnails = thumbnailValue;
-	} else if ( thumbnailValue ) {
-		rawThumbnails = [ thumbnailValue ];
-	}
-
-	for ( const value of rawThumbnails ) {
-		const thumbnail = normalizeThumbnail( value );
-		if ( thumbnail ) {
-			thumbnails.push( thumbnail );
-		}
-	}
-
-	return thumbnails.slice( 0, 4 );
-}
-
-function artifactDiagnosticsCount( sources: Record< string, unknown >[] ): number | undefined {
-	const explicitCount = readArtifactNumber( sources, [ 'diagnostics_count', 'diagnosticsCount', 'diagnostic_count', 'diagnosticCount' ] );
-	if ( explicitCount !== undefined ) {
-		return explicitCount;
-	}
-
-	const diagnostics = getArtifactSourceValue( sources, [ 'diagnostics', 'issues', 'warnings' ] );
-	if ( Array.isArray( diagnostics ) ) {
-		return diagnostics.length;
-	}
-
-	const diagnosticsRecord = asRecord( diagnostics );
-	return diagnosticsRecord ? Object.keys( diagnosticsRecord ).length : undefined;
-}
-
-function artifactErrorMessage( sources: Record< string, unknown >[] ): string | undefined {
-	const explicitError = readArtifactString( sources, [ 'error', 'error_message', 'errorMessage', 'failure_reason', 'failureReason' ] );
-	if ( explicitError ) {
-		return explicitError;
-	}
-
-	for ( const source of sources ) {
-		const error = asRecord( source.error );
-		const message = error ? readString( error, [ 'message', 'detail' ] ) : undefined;
-		if ( message ) {
-			return message;
-		}
-	}
-
-	return undefined;
-}
-
-function artifactPayloadFromToolGroup( group: ToolGroup ): ArtifactStatusPayload | null {
-	const sources = collectArtifactSources( group );
-	const phase = readArtifactString( sources, [ 'phase', 'artifact_phase', 'artifactPhase', 'step', 'stage' ] );
-	let statusFromSuccess: ArtifactStatusPayload[ 'status' ] | null = null;
-	if ( group.success === false ) {
-		statusFromSuccess = 'failed';
-	} else if ( group.success === true ) {
-		statusFromSuccess = 'completed';
-	}
-	const status = normalizeArtifactStatus( getArtifactSourceValue( sources, [ 'status', 'state', 'phase_status', 'phaseStatus' ] ) )
-		?? statusFromSuccess;
-
-	if ( ! phase || ! status ) {
-		return null;
-	}
-
-	const title = readArtifactString( sources, [ 'title', 'label', 'name' ] ) ?? titleFromPhase( phase );
-
-	return {
-		title,
-		phase,
-		status,
-		description: readArtifactString( sources, [ 'description', 'message', 'summary', 'detail' ] ),
-		diagnosticsCount: artifactDiagnosticsCount( sources ),
-		previewUrl: readArtifactString( sources, [ 'preview_url', 'previewUrl', 'url' ] ),
-		materializedUrl: readArtifactString( sources, [ 'materialized_url', 'materializedUrl', 'final_url', 'finalUrl', 'result_url', 'resultUrl' ] ),
-		thumbnails: collectArtifactThumbnails( sources ),
-		error: artifactErrorMessage( sources ),
-	};
-}
-
-function normalizeQuestionChoice( value: unknown ): QuestionChoice | null {
-	if ( ! value || typeof value !== 'object' || Array.isArray( value ) ) {
-		return null;
-	}
-
-	const choice = value as Record< string, unknown >;
-	const label = typeof choice.label === 'string' ? choice.label.trim() : '';
-	if ( ! label ) {
-		return null;
-	}
-
-	return {
-		label,
-		message: typeof choice.message === 'string' ? choice.message : undefined,
-		description: typeof choice.description === 'string' ? choice.description : undefined,
-	};
-}
-
-function questionPayloadFromToolGroup( group: ToolGroup ): QuestionPayload | null {
-	const result = group.resultMessage ? parseJsonObject( group.resultMessage.content ) : null;
-	const source = result && typeof result.result === 'object' && ! Array.isArray( result.result )
-		? result.result as Record< string, unknown >
-		: result ?? group.parameters;
-	const question = typeof source.question === 'string' ? source.question.trim() : '';
-	if ( ! question ) {
-		return null;
-	}
-
-	const choices = Array.isArray( source.choices )
-		? source.choices.map( normalizeQuestionChoice ).filter( ( choice ): choice is QuestionChoice => !! choice )
-		: [];
-
-	return {
-		question,
-		choices,
-		allow_freeform: source.allow_freeform !== false,
-		freeform_label: typeof source.freeform_label === 'string' ? source.freeform_label : undefined,
-		freeform_placeholder: typeof source.freeform_placeholder === 'string' ? source.freeform_placeholder : undefined,
-	};
-}
-
-function renderQuestionCard( group: ToolGroup, context: ToolRendererContext ): ReactNode {
-	const payload = questionPayloadFromToolGroup( group );
-	if ( ! payload ) {
-		return null;
-	}
-
-	return createElement( QuestionCard, {
-		question: payload.question ?? '',
-		choices: payload.choices,
-		allowFreeform: false,
-		freeformLabel: payload.freeform_label,
-		freeformPlaceholder: payload.freeform_placeholder,
-		disabled: context.isLoading,
-		onSubmitAnswer: context.sendMessage,
-	} );
-}
-
-function artifactStatusLabel( status: ArtifactPhaseStatus ): string {
+function artifactStatusLabel( status: ArtifactStatus ): string {
 	switch ( status ) {
 		case 'pending':
 			return __( 'Pending', 'frontend-agent-chat' );
@@ -752,15 +429,10 @@ function artifactStatusCopy( payload: ArtifactStatusPayload ): string {
 	}
 }
 
-function renderArtifactStatusCard( group: ToolGroup ): ReactNode {
-	const payload = artifactPayloadFromToolGroup( group );
-	if ( ! payload ) {
-		return createElement( ToolMessage, { group } );
-	}
-
+function renderArtifactStatusPayload( payload: ArtifactStatusPayload ): ReactNode {
 	const hasError = payload.status === 'failed';
-	const linkUrl = payload.materializedUrl ?? payload.previewUrl;
-	const linkLabel = payload.materializedUrl
+	const linkUrl = payload.resultUrl ?? payload.previewUrl;
+	const linkLabel = payload.resultUrl
 		? __( 'Open result', 'frontend-agent-chat' )
 		: __( 'Open preview', 'frontend-agent-chat' );
 
@@ -894,7 +566,6 @@ export default function AgentChat( {
 		description: agentDescription,
 	} ] : [] );
 	const [ selectedAgentSlug, setSelectedAgentSlug ] = useState( agentSlug ?? '' );
-	const metadata = useClientContextMetadata();
 	const selectedAgent = useMemo(
 		() => agents.find( ( agent ) => agent.slug === selectedAgentSlug ),
 		[ agents, selectedAgentSlug ]
@@ -903,9 +574,7 @@ export default function AgentChat( {
 	const activeAgentName = selectedAgent?.name ?? agentName;
 	const activeAgentDescription = selectedAgent?.description ?? agentDescription;
 	const agentFetch = useMemo( () => createAgentFetch( activeAgentSlug ), [ activeAgentSlug ] );
-	const runCapabilities = useMemo( () => createRunCapabilities( capabilities ), [ capabilities ] );
-	const cancelRun = useMemo( () => createCancelRun( agentFetch, basePath ), [ agentFetch, basePath ] );
-	const queueMessage = useMemo( () => createQueueMessage( agentFetch, wpMediaUpload, basePath ), [ agentFetch, basePath ] );
+	const runAdapter = useMemo( () => createFrontendRunAdapter( agentFetch, wpMediaUpload, basePath, capabilities ), [ agentFetch, basePath, capabilities ] );
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {
 		if ( isInline ) {
@@ -945,12 +614,12 @@ export default function AgentChat( {
 		} );
 		dispatchResponseMetadata( responseMetadata );
 		if ( capabilities?.chat_run_events ) {
-			dispatchRunEvents( agentFetch, basePath, responseMetadata ).catch( ( err: unknown ) => {
+			dispatchRunEvents( runAdapter, responseMetadata ).catch( ( err: unknown ) => {
 				// eslint-disable-next-line no-console
 				console.error( 'AgentChat: failed to fetch chat run events', err );
 			} );
 		}
-	}, [ activeAgentSlug, agentFetch, basePath, capabilities?.chat_run_events ] );
+	}, [ activeAgentSlug, capabilities?.chat_run_events, runAdapter ] );
 
 	useEffect( () => {
 		if ( isInline ) {
@@ -1035,17 +704,29 @@ export default function AgentChat( {
 	}, [ isExpanded, isInline, isOpen ] );
 
 	const toolRenderers = useMemo(
-		() => ( {
-			artifact_phase: renderArtifactStatusCard,
-			start_artifact_generation: renderArtifactStatusCard,
-			artifact_status: renderArtifactStatusCard,
-			artifact_status_update: renderArtifactStatusCard,
-			artifact_task_status: renderArtifactStatusCard,
-			edit_post_blocks: renderDiffCard,
-			replace_post_blocks: renderDiffCard,
-			insert_content: renderDiffCard,
-			present_question: renderQuestionCard,
-		} ),
+		() => {
+			const artifactRenderer = createArtifactStatusToolRenderer( {
+				render: ( payload ) => renderArtifactStatusPayload( payload ),
+				fallback: ( group ) => createElement( ToolMessage, { group } ),
+			} );
+			const diffRenderer = createPendingActionDiffRenderer( {
+				onAccept: ( actionId: string ) => resolvePendingAction( actionId, 'accepted' ),
+				onReject: ( actionId: string ) => resolvePendingAction( actionId, 'rejected' ),
+			} );
+			const questionRenderer = createQuestionToolRenderer();
+
+			return {
+				artifact_phase: artifactRenderer,
+				start_artifact_generation: artifactRenderer,
+				artifact_status: artifactRenderer,
+				artifact_status_update: artifactRenderer,
+				artifact_task_status: artifactRenderer,
+				edit_post_blocks: diffRenderer,
+				replace_post_blocks: diffRenderer,
+				insert_content: diffRenderer,
+				present_question: questionRenderer,
+			};
+		},
 		[]
 	);
 	const hasPersistenceCta = !! (
@@ -1172,7 +853,8 @@ export default function AgentChat( {
 						__( 'Ask %s anything…', 'frontend-agent-chat' ),
 						activeAgentName
 					),
-					metadata,
+					clientContext: true,
+					clientContextOptions: { metadataKey: 'client_context' },
 					onMessage: handleMessage,
 					onError: handleError,
 					onResponseMetadata: handleResponseMetadata,
@@ -1188,10 +870,7 @@ export default function AgentChat( {
 					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,
-					runCapabilities,
-					getRunId,
-					onCancelRun: cancelRun,
-					onQueueMessage: queueMessage,
+					runAdapter,
 					cancelLabel: __( 'Stop', 'frontend-agent-chat' ),
 					processingLabel: ( turnCount: number ) =>
 						sprintf(
