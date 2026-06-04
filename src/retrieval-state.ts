@@ -52,8 +52,6 @@ const SOURCE_COUNT_PATHS = [
 	[ 'sourcesCount' ],
 	[ 'citation_count' ],
 	[ 'citationCount' ],
-	[ 'context_count' ],
-	[ 'contextCount' ],
 	[ 'retrieval', 'source_count' ],
 	[ 'retrieval', 'sourceCount' ],
 	[ 'retrieval', 'sources' ],
@@ -67,7 +65,6 @@ const SOURCE_COUNT_PATHS = [
 	[ 'grounding', 'sources' ],
 	[ 'sources' ],
 	[ 'citations' ],
-	[ 'contexts' ],
 ];
 
 export function getRetrievalState( metadata: Record< string, unknown > | undefined ): RetrievalState | null {

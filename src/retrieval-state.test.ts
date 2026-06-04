@@ -51,7 +51,7 @@ describe( 'getRetrievalState', () => {
 	it( 'renders retrieval-error state without exposing debug payloads', () => {
 		expect( getRetrievalState( {
 			retrieval_status: 'retrieval error',
-			error: 'vector database timeout at shard 3',
+			error: 'internal lookup timeout',
 			debug: { query: 'private' },
 		} ) ).toEqual( {
 			kind: 'error',
