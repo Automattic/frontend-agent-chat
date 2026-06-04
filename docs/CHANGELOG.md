@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.11.0] - 2026-06-04
+
+### Added
+- add retrieval diagnostics panel
+
+### Changed
+- Migrate frontend chat onto shared chat primitives
+- bump @extrachill/chat to v0.14.0
+- Tighten retrieval state metadata parsing
+- Align source cards with generic citation identifiers
+- Add retrieval state indicators
+- Add source card rendering for chat citations
+
+### Fixed
+- keep diagnostics panel generic
+
 ## [0.10.0] - 2026-05-31
 
 ### Added
