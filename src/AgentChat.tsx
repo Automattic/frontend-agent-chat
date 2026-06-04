@@ -36,6 +36,12 @@ import { createElement, useState, useCallback, useMemo, useEffect } from '@wordp
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 
+/**
+ * Internal dependencies
+ */
+import { getRetrievalState } from './retrieval-state';
+import type { RetrievalState } from './retrieval-state';
+
 interface AgentChatProps {
 	agentSlug?: string;
 	basePath: string;
@@ -563,6 +569,22 @@ function renderFabIcon( icon: string, path: string, viewBox: string ): ReactNode
 		: null;
 }
 
+function renderRetrievalState( state: RetrievalState | null ): ReactNode {
+	if ( ! state ) {
+		return null;
+	}
+
+	return createElement(
+		'div',
+		{
+			className: `frontend-agent-chat__retrieval-state is-${ state.kind.replace( '_', '-' ) }`,
+			role: state.kind === 'error' ? 'status' : undefined,
+		},
+		createElement( 'span', { className: 'frontend-agent-chat__retrieval-state-label' }, state.label ),
+		createElement( 'span', { className: 'frontend-agent-chat__retrieval-state-description' }, state.description )
+	);
+}
+
 export default function AgentChat( {
 	agentSlug,
 	basePath,
@@ -592,6 +614,7 @@ export default function AgentChat( {
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] = useState( isLoggedIn );
 	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] = useState( false );
 	const [ operatorDiagnosticsMetadata, setOperatorDiagnosticsMetadata ] = useState< Record< string, unknown > | null >( null );
+	const [ retrievalState, setRetrievalState ] = useState< RetrievalState | null >( null );
 	const [ agents, setAgents ] = useState< AgentSummary[] >( () => agentSlug ? [ {
 		slug: agentSlug,
 		name: agentName,
@@ -628,6 +651,8 @@ export default function AgentChat( {
 			return;
 		}
 
+		setRetrievalState( null );
+
 		dispatchLifecycleEvent( 'message-submitted', {
 			agent: activeAgentSlug,
 			message_id: message.id,
@@ -641,6 +666,7 @@ export default function AgentChat( {
 		} );
 	}, [ activeAgentSlug ] );
 	const handleResponseMetadata = useCallback( ( responseMetadata: Record< string, unknown > ) => {
+		setRetrievalState( getRetrievalState( responseMetadata ) );
 		dispatchLifecycleEvent( 'response-metadata', {
 			agent: activeAgentSlug,
 			metadata: responseMetadata,
@@ -721,6 +747,7 @@ export default function AgentChat( {
 
 	useEffect( () => {
 		setUnreadCount( 0 );
+		setRetrievalState( null );
 	}, [ activeAgentSlug ] );
 
 	// Escape exits expanded mode first, then closes the drawer.
@@ -767,6 +794,23 @@ export default function AgentChat( {
 		},
 		[]
 	);
+	const renderChatHeader = useCallback( () => {
+		const retrievalStateNode = renderRetrievalState( retrievalState );
+		const operatorDiagnosticsNode = canShowOperatorDiagnostics
+			? renderOperatorDiagnosticsPanel( operatorDiagnosticsMetadata )
+			: null;
+
+		if ( ! retrievalStateNode && ! operatorDiagnosticsNode ) {
+			return null;
+		}
+
+		return createElement(
+			'div',
+			{ className: 'frontend-agent-chat__chat-header' },
+			retrievalStateNode,
+			operatorDiagnosticsNode
+		);
+	}, [ canShowOperatorDiagnostics, operatorDiagnosticsMetadata, retrievalState ] );
 	const hasPersistenceCta = !! (
 		persistenceCta?.message ||
 		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
@@ -908,9 +952,7 @@ export default function AgentChat( {
 					messageSuggestionsLabel: __( 'Try asking', 'frontend-agent-chat' ),
 					loadingMessages,
 					mediaUploadFn: wpMediaUpload,
-					renderHeader: () => canShowOperatorDiagnostics
-						? renderOperatorDiagnosticsPanel( operatorDiagnosticsMetadata )
-						: null,
+					renderHeader: renderChatHeader,
 					runAdapter,
 					cancelLabel: __( 'Stop', 'frontend-agent-chat' ),
 					processingLabel: ( turnCount: number ) =>
