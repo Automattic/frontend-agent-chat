@@ -158,7 +158,7 @@ function frontend_agent_chat_enqueue() {
 		'layout'                      => 'inline' === ( $config['layout'] ?? '' ) ? 'inline' : 'floating',
 		'isLoggedIn'                  => is_user_logged_in(),
 		'capabilities'                => $capabilities,
-		'retrievalDiagnosticsEnabled' => ! empty( $config['retrieval_diagnostics'] ) || ! empty( $capabilities['retrieval_diagnostics'] ),
+		'operatorDiagnosticsEnabled'  => ! empty( $config['operator_diagnostics'] ) || ! empty( $capabilities['operator_diagnostics'] ),
 	);
 
 	/**

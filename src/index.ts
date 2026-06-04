@@ -60,9 +60,9 @@ declare global {
 				chat_run_cancel?: boolean;
 				chat_message_queue?: boolean;
 				chat_run_events?: boolean;
-				retrieval_diagnostics?: boolean;
+				operator_diagnostics?: boolean;
 			};
-			retrievalDiagnosticsEnabled?: boolean;
+			operatorDiagnosticsEnabled?: boolean;
 		};
 	}
 }
@@ -113,7 +113,7 @@ function init(): void {
 			persistenceCta: config.persistenceCta,
 			messageSuggestions: config.messageSuggestions,
 			capabilities: config.capabilities,
-			retrievalDiagnosticsEnabled: config.retrievalDiagnosticsEnabled,
+			operatorDiagnosticsEnabled: config.operatorDiagnosticsEnabled,
 		} )
 	);
 }

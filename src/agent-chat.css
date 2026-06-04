@@ -208,7 +208,7 @@
 	outline-offset: 2px;
 }
 
-.frontend-agent-chat__retrieval-diagnostics {
+.frontend-agent-chat__operator-diagnostics {
 	margin: var(--frontend-agent-chat-spacing-sm, 12px) var(--frontend-agent-chat-spacing-md, 16px) 0;
 	padding: var(--frontend-agent-chat-spacing-sm, 12px);
 	border: 1px solid var(--frontend-agent-chat-border-color, #e2e8f0);
@@ -219,29 +219,29 @@
 	font-size: 12px;
 }
 
-.frontend-agent-chat__retrieval-diagnostics summary {
+.frontend-agent-chat__operator-diagnostics summary {
 	cursor: pointer;
 	font-weight: 700;
 }
 
-.frontend-agent-chat__retrieval-diagnostics dl {
+.frontend-agent-chat__operator-diagnostics dl {
 	display: grid;
 	gap: 8px;
 	margin: 10px 0 0;
 }
 
-.frontend-agent-chat__retrieval-diagnostics-row {
+.frontend-agent-chat__operator-diagnostics-row {
 	display: grid;
 	grid-template-columns: minmax(96px, 0.35fr) 1fr;
 	gap: 8px;
 }
 
-.frontend-agent-chat__retrieval-diagnostics dt {
+.frontend-agent-chat__operator-diagnostics dt {
 	color: var(--frontend-agent-chat-text-secondary, #64748b);
 	font-weight: 700;
 }
 
-.frontend-agent-chat__retrieval-diagnostics dd {
+.frontend-agent-chat__operator-diagnostics dd {
 	min-width: 0;
 	margin: 0;
 	overflow-wrap: anywhere;
