@@ -6,6 +6,7 @@
 	"scripts": {
 		"build": "wp-scripts build",
 		"test:diagnostics": "node --no-warnings --experimental-strip-types tests/operator-diagnostics-smoke.ts",
+		"test:unit": "wp-scripts test-unit-js --runInBand",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
