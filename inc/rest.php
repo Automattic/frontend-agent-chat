@@ -1038,8 +1038,9 @@ function frontend_agent_chat_normalize_source_card( $raw_source ): array {
 		'title'       => array( 'title', 'source_title', 'sourceTitle', 'name', 'label' ),
 		'url'         => array( 'url', 'source_url', 'sourceUrl', 'href', 'link' ),
 		'snippet'     => array( 'snippet', 'excerpt', 'summary', 'text', 'content', 'quote' ),
-		'document_id' => array( 'document_id', 'documentId', 'doc_id', 'docId', 'document', 'id' ),
-		'chunk_id'    => array( 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ),
+		'source_id'   => array( 'source_id', 'sourceId' ),
+		'item_id'     => array( 'item_id', 'itemId', 'document_id', 'documentId', 'doc_id', 'docId', 'document', 'id' ),
+		'fragment_id' => array( 'fragment_id', 'fragmentId', 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ),
 	) as $target_key => $source_keys ) {
 		$value = frontend_agent_chat_first_string_value( $raw_source, $source_keys );
 		if ( '' !== $value ) {

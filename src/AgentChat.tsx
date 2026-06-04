@@ -165,8 +165,9 @@ interface SourceCardPayload {
 	title?: string;
 	url?: string;
 	snippet?: string;
-	documentId?: string;
-	chunkId?: string;
+	sourceId?: string;
+	itemId?: string;
+	fragmentId?: string;
 	accessibleLabel?: string;
 }
 
@@ -485,8 +486,9 @@ function normalizeSourceCard( value: unknown ): SourceCardPayload | null {
 		title: readString( source, [ 'title', 'source_title', 'sourceTitle', 'name', 'label' ] ),
 		url: readString( source, [ 'url', 'source_url', 'sourceUrl', 'href', 'link' ] ),
 		snippet: readString( source, [ 'snippet', 'excerpt', 'summary', 'text', 'content', 'quote' ] ),
-		documentId: readString( source, [ 'document_id', 'documentId', 'doc_id', 'docId', 'document', 'id' ] ),
-		chunkId: readString( source, [ 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ] ),
+		sourceId: readString( source, [ 'source_id', 'sourceId' ] ),
+		itemId: readString( source, [ 'item_id', 'itemId', 'document_id', 'documentId', 'doc_id', 'docId', 'document', 'id' ] ),
+		fragmentId: readString( source, [ 'fragment_id', 'fragmentId', 'chunk_id', 'chunkId', 'chunk', 'chunk_ref', 'chunkRef' ] ),
 		accessibleLabel: readString( source, [ 'accessible_label', 'accessibleLabel', 'aria_label', 'ariaLabel' ] ),
 	};
 
@@ -528,7 +530,7 @@ function sourceCardsFromToolGroup( group: ToolGroup ): SourceCardPayload[] {
 
 	const seen = new Set< string >();
 	return sources.filter( ( source ) => {
-		const key = [ source.url, source.title, source.documentId, source.chunkId, source.snippet ].join( '\u0000' );
+		const key = [ source.url, source.title, source.sourceId, source.itemId, source.fragmentId, source.snippet ].join( '\u0000' );
 		if ( seen.has( key ) ) {
 			return false;
 		}
@@ -839,16 +841,20 @@ function renderSourceCards( group: ToolGroup ): ReactNode {
 					) : createElement( 'span', { className: 'frontend-agent-chat__source-card-title' }, title )
 				),
 				source.snippet && createElement( 'p', { className: 'frontend-agent-chat__source-card-snippet' }, source.snippet ),
-				( source.documentId || source.chunkId ) && createElement(
+				( source.sourceId || source.itemId || source.fragmentId ) && createElement(
 					'dl',
 					{ className: 'frontend-agent-chat__source-card-debug' },
-					source.documentId && createElement( 'div', null,
-						createElement( 'dt', null, __( 'Document', 'frontend-agent-chat' ) ),
-						createElement( 'dd', null, source.documentId )
+					source.sourceId && createElement( 'div', null,
+						createElement( 'dt', null, __( 'Source ID', 'frontend-agent-chat' ) ),
+						createElement( 'dd', null, source.sourceId )
 					),
-					source.chunkId && createElement( 'div', null,
-						createElement( 'dt', null, __( 'Chunk', 'frontend-agent-chat' ) ),
-						createElement( 'dd', null, source.chunkId )
+					source.itemId && createElement( 'div', null,
+						createElement( 'dt', null, __( 'Item ID', 'frontend-agent-chat' ) ),
+						createElement( 'dd', null, source.itemId )
+					),
+					source.fragmentId && createElement( 'div', null,
+						createElement( 'dt', null, __( 'Fragment ID', 'frontend-agent-chat' ) ),
+						createElement( 'dd', null, source.fragmentId )
 					)
 				)
 			);

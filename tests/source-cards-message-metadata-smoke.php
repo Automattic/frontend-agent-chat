@@ -35,8 +35,9 @@ $messages = frontend_agent_chat_session_messages(
 							'title'       => 'Public docs',
 							'url'         => 'https://example.com/docs',
 							'snippet'     => 'A short excerpt from the source.',
-							'document_id' => 'doc-123',
-							'chunk_id'    => 'chunk-4',
+							'source_id'   => 'source-1',
+							'item_id'     => 'item-123',
+							'fragment_id' => 'fragment-4',
 						),
 					),
 				),
@@ -51,11 +52,12 @@ frontend_agent_chat_source_cards_assert( 'tool_call' === ( $messages[1]['metadat
 frontend_agent_chat_source_cards_assert( 'source_cards' === ( $messages[1]['metadata']['tool_name'] ?? '' ), 'Source-card tool name is generic.' );
 frontend_agent_chat_source_cards_assert( 'Public docs' === ( $messages[1]['metadata']['parameters']['sources'][0]['title'] ?? '' ), 'Source title is normalized.' );
 frontend_agent_chat_source_cards_assert( 'https://example.com/docs' === ( $messages[1]['metadata']['parameters']['sources'][0]['url'] ?? '' ), 'Source URL is normalized.' );
-frontend_agent_chat_source_cards_assert( 'doc-123' === ( $messages[1]['metadata']['parameters']['sources'][0]['document_id'] ?? '' ), 'Document id is preserved.' );
+frontend_agent_chat_source_cards_assert( 'source-1' === ( $messages[1]['metadata']['parameters']['sources'][0]['source_id'] ?? '' ), 'Source id is preserved.' );
+frontend_agent_chat_source_cards_assert( 'item-123' === ( $messages[1]['metadata']['parameters']['sources'][0]['item_id'] ?? '' ), 'Item id is preserved.' );
 frontend_agent_chat_source_cards_assert( 'tool_result' === ( $messages[2]['metadata']['type'] ?? '' ), 'Source cards include a tool result envelope.' );
 
 $tool_result = json_decode( (string) $messages[2]['content'], true );
 frontend_agent_chat_source_cards_assert( is_array( $tool_result ), 'Source-card result content is JSON.' );
-frontend_agent_chat_source_cards_assert( 'chunk-4' === ( $tool_result['sources'][0]['chunk_id'] ?? '' ), 'Chunk id survives session reload result payload.' );
+frontend_agent_chat_source_cards_assert( 'fragment-4' === ( $tool_result['sources'][0]['fragment_id'] ?? '' ), 'Fragment id survives session reload result payload.' );
 
-echo "Frontend source-card metadata smoke passed (9 assertions).\n";
+echo "Frontend source-card metadata smoke passed (11 assertions).\n";
