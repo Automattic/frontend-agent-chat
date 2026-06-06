@@ -28,6 +28,7 @@ function frontend_agent_chat_get_config(): array {
 		'expand_icon_view_box' => '0 0 24 24',
 		'loading_messages'     => true,
 		'message_suggestions'  => array(),
+		'chat_context'         => array(),
 		'operator_diagnostics' => false,
 		'layout'               => 'floating',
 	);

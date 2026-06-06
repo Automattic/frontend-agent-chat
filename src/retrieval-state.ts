@@ -1,4 +1,11 @@
-export type RetrievalStateKind = 'grounded' | 'partial' | 'no_answer' | 'error';
+export type RetrievalStateKind =
+	| 'grounded'
+	| 'partial'
+	| 'no_answer'
+	| 'permission_denied'
+	| 'source_restricted'
+	| 'stale'
+	| 'error';
 
 export interface RetrievalState {
 	kind: RetrievalStateKind;
@@ -13,9 +20,25 @@ const STATUS_ALIASES: Record< string, RetrievalStateKind > = {
 	available: 'grounded',
 	retrieved: 'grounded',
 	partial: 'partial',
+	partial_result: 'partial',
+	partial_results: 'partial',
+	partial_sources: 'partial',
 	limited: 'partial',
 	insufficient: 'partial',
 	weak: 'partial',
+	permission_denied: 'permission_denied',
+	access_denied: 'permission_denied',
+	forbidden: 'permission_denied',
+	not_authorized: 'permission_denied',
+	source_restricted: 'source_restricted',
+	restricted: 'source_restricted',
+	restricted_source: 'source_restricted',
+	restricted_sources: 'source_restricted',
+	sources_restricted: 'source_restricted',
+	stale: 'stale',
+	stale_source: 'stale',
+	stale_sources: 'stale',
+	stale_context: 'stale',
 	no_answer: 'no_answer',
 	no_answer_found: 'no_answer',
 	no_relevant_source: 'no_answer',
@@ -39,10 +62,17 @@ const STATUS_PATHS = [
 	[ 'retrievedContextStatus' ],
 	[ 'retrieval', 'status' ],
 	[ 'retrieval', 'state' ],
+	[ 'retrieval', 'diagnostic' ],
 	[ 'retrieved_context', 'status' ],
 	[ 'retrievedContext', 'status' ],
 	[ 'grounding', 'status' ],
 	[ 'grounding', 'state' ],
+	[ 'source_diagnostics', 'status' ],
+	[ 'sourceDiagnostics', 'status' ],
+	[ 'source_diagnostics', 'kind' ],
+	[ 'sourceDiagnostics', 'kind' ],
+	[ 'diagnostics', 'retrieval_status' ],
+	[ 'diagnostics', 'retrievalStatus' ],
 ];
 
 const SOURCE_COUNT_PATHS = [
@@ -111,6 +141,33 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 		};
 	}
 
+	if ( kind === 'permission_denied' ) {
+		return {
+			kind,
+			label: 'Some sources need permission',
+			description: 'The agent could not use one or more sources for this request.',
+			sourceCount,
+		};
+	}
+
+	if ( kind === 'source_restricted' ) {
+		return {
+			kind,
+			label: 'Source access was restricted',
+			description: 'The answer may exclude sources that are restricted for this chat.',
+			sourceCount,
+		};
+	}
+
+	if ( kind === 'stale' ) {
+		return {
+			kind,
+			label: 'Sources may be stale',
+			description: 'Retrieved context was available, but some source freshness warnings were reported.',
+			sourceCount,
+		};
+	}
+
 	return {
 		kind,
 		label: 'Retrieval unavailable',
@@ -142,6 +199,18 @@ function inferStatus( metadata: Record< string, unknown >, sourceCount: number |
 
 	if ( readBoolean( metadata, [ 'partial_evidence', 'partialEvidence', 'partial_context', 'partialContext' ] ) ) {
 		return 'partial';
+	}
+
+	if ( readBoolean( metadata, [ 'permission_denied', 'permissionDenied', 'access_denied', 'accessDenied' ] ) ) {
+		return 'permission_denied';
+	}
+
+	if ( readBoolean( metadata, [ 'source_restricted', 'sourceRestricted', 'sources_restricted', 'sourcesRestricted' ] ) ) {
+		return 'source_restricted';
+	}
+
+	if ( readBoolean( metadata, [ 'stale_source', 'staleSource', 'stale_sources', 'staleSources' ] ) ) {
+		return 'stale';
 	}
 
 	if ( sourceCount !== undefined ) {

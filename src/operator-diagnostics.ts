@@ -9,6 +9,10 @@ export interface OperatorDiagnosticsPanel {
 }
 
 const DIAGNOSTICS_KEYS = [
+	'source_diagnostics',
+	'sourceDiagnostics',
+	'retrieval_diagnostics',
+	'retrievalDiagnostics',
 	'operator_diagnostics',
 	'operatorDiagnostics',
 	'diagnostics',
@@ -115,7 +119,7 @@ export function getOperatorDiagnosticsPanel( metadata: Record< string, unknown >
 
 	const title = stringifyValue( source.title ?? source.label );
 	return {
-		title: title || 'Operator diagnostics',
+		title: title || 'Source diagnostics',
 		rows,
 	};
 }
