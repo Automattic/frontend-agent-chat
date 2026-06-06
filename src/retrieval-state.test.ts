@@ -73,6 +73,41 @@ describe( 'getRetrievalState', () => {
 		} );
 	} );
 
+	it( 'renders source restriction diagnostics from generic metadata', () => {
+		expect(
+			getRetrievalState( {
+				source_diagnostics: {
+					status: 'source restricted',
+				},
+				citation_count: 2,
+			} )
+		).toEqual( {
+			kind: 'source_restricted',
+			label: 'Source access was restricted',
+			description:
+				'The answer may exclude sources that are restricted for this chat.',
+			sourceCount: 2,
+		} );
+	} );
+
+	it( 'renders stale-source diagnostics from generic metadata', () => {
+		expect(
+			getRetrievalState( {
+				retrieval: {
+					diagnostic: 'stale sources',
+				},
+			} )?.kind
+		).toBe( 'stale' );
+	} );
+
+	it( 'renders permission diagnostics without source-specific labels', () => {
+		expect(
+			getRetrievalState( {
+				permissionDenied: true,
+			} )?.label
+		).toBe( 'Some sources need permission' );
+	} );
+
 	it( 'infers grounded state from source count metadata', () => {
 		expect(
 			getRetrievalState( {

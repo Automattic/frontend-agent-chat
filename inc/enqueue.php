@@ -85,6 +85,54 @@ function frontend_agent_chat_sanitize_message_suggestions( $suggestions ): array
 }
 
 /**
+ * Sanitize generic chat context forwarded with widget messages.
+ *
+ * This is intentionally an opaque key/value payload. Integrations may use it
+ * to provide a selected brain, corpus, or source-scope hint while Agents API
+ * and domain plugins own the concrete semantics and authorization checks.
+ *
+ * @param mixed $context Raw context configuration.
+ * @return array<string,mixed> Sanitized context.
+ */
+function frontend_agent_chat_sanitize_chat_context( $context ): array {
+	if ( ! is_array( $context ) ) {
+		return array();
+	}
+
+	$sanitized = array();
+	foreach ( $context as $key => $value ) {
+		$key = sanitize_key( (string) $key );
+		if ( '' === $key ) {
+			continue;
+		}
+
+		if ( is_bool( $value ) || is_int( $value ) || is_float( $value ) ) {
+			$sanitized[ $key ] = $value;
+			continue;
+		}
+
+		if ( is_string( $value ) ) {
+			$sanitized[ $key ] = sanitize_text_field( $value );
+			continue;
+		}
+
+		if ( is_array( $value ) ) {
+			$items = array();
+			foreach ( $value as $item ) {
+				if ( is_scalar( $item ) ) {
+					$items[] = sanitize_text_field( (string) $item );
+				}
+			}
+			if ( ! empty( $items ) ) {
+				$sanitized[ $key ] = $items;
+			}
+		}
+	}
+
+	return $sanitized;
+}
+
+/**
  * Enqueue the frontend chat script and styles.
  *
  * Fires on wp_enqueue_scripts so the assets load on every frontend page.
@@ -190,6 +238,11 @@ function frontend_agent_chat_enqueue() {
 	$message_suggestions = frontend_agent_chat_sanitize_message_suggestions( $config['message_suggestions'] ?? array() );
 	if ( ! empty( $message_suggestions ) ) {
 		$js_config['messageSuggestions'] = $message_suggestions;
+	}
+
+	$chat_context = frontend_agent_chat_sanitize_chat_context( $config['chat_context'] ?? $config['context'] ?? array() );
+	if ( ! empty( $chat_context ) ) {
+		$js_config['chatContext'] = $chat_context;
 	}
 
 	wp_localize_script(

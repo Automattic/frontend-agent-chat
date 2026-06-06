@@ -6,11 +6,12 @@ import {
 } from '../src/operator-diagnostics.ts';
 
 const metadata = {
-	operator_diagnostics: {
+	source_diagnostics: {
 		title: 'Retrieval diagnostics',
 		rows: [
 			{ label: 'Mode', value: 'semantic' },
 			{ label: 'Result count', value: 3 },
+			{ label: 'Restricted sources', value: 1 },
 			{ label: 'Provider errors', value: [ 'timeout' ] },
 		],
 	},
@@ -36,7 +37,7 @@ assert.equal(
 
 assert.deepEqual(
 	getOperatorDiagnosticsRows( metadata ).map( ( row ) => row.label ),
-	[ 'Mode', 'Result count', 'Provider errors' ],
+	[ 'Mode', 'Result count', 'Restricted sources', 'Provider errors' ],
 	'operator diagnostics rows are supplied by metadata rather than a built-in domain field map'
 );
 
