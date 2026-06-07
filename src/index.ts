@@ -13,6 +13,8 @@
  */
 import type { ReactElement } from 'react';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
+import '@automattic/agenttic-ui/global.css';
+import '@automattic/agenttic-ui/embedded-agent-ui.css';
 
 /**
  * WordPress dependencies
