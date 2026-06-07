@@ -10,7 +10,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@extrachill/chat": "^0.14.0",
+		"@automattic/agenttic-client": "file:../agenttic@agents-api-adapter/packages/agenttic-client",
+		"@automattic/agenttic-ui": "file:../agenttic@agents-api-adapter/packages/agenttic-ui",
 		"@wordpress/element": "^6.46.0",
 		"@wordpress/i18n": "^6.21.0"
 	},

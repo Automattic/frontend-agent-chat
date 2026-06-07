@@ -1,6 +1,6 @@
 <?php
 /**
- * REST adapter for @extrachill/chat.
+ * REST adapter for Agenttic chat clients.
  *
  * @package FrontendAgentChat
  */
@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Register REST routes expected by @extrachill/chat.
+ * Register REST routes expected by Agenttic chat clients.
  *
  * @return void
  */
@@ -859,7 +859,7 @@ function frontend_agent_chat_extract_session_id( array $session ): string {
 }
 
 /**
- * Normalize canonical agents/chat result messages to @extrachill/chat messages.
+ * Normalize canonical agents/chat result messages to Agenttic chat messages.
  *
  * @param array  $result       Runtime result.
  * @param string $user_message Original user message.
@@ -890,7 +890,7 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
  *
  * Normalizes both classic single-string content and multimodal content
  * (an array of text/image parts produced by user image uploads) into the
- * @extrachill/chat wire shape: `content` is always a plain string, and
+ * Agenttic chat wire shape: `content` is always a plain string, and
  * media is surfaced separately via `metadata.attachments` so the frontend
  * normalizer can render image previews on session reload.
  *
@@ -938,7 +938,7 @@ function frontend_agent_chat_session_messages( array $source ): array {
 }
 
 /**
- * Normalize citation-like metadata into the raw message contract used by @extrachill/chat.
+ * Normalize citation-like metadata into the raw message contract used by Agenttic chat.
  *
  * @param array $metadata Message or response metadata.
  * @return array

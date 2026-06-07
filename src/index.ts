@@ -11,9 +11,8 @@
 /**
  * External dependencies
  */
-import '@extrachill/chat/css';
 import type { ReactElement } from 'react';
-import type { ChatMessageSuggestion } from '@extrachill/chat';
+import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 
 /**
  * WordPress dependencies

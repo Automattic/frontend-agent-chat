@@ -1,2 +1,2 @@
 declare module '*.css';
-declare module '@extrachill/chat/css';
+declare module '@automattic/agenttic-ui/index.css';
