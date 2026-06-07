@@ -89,7 +89,6 @@ interface AgentChatProps {
 		actionUrl?: string;
 	};
 	messageSuggestions?: ChatMessageSuggestion[];
-	chatContext?: Record< string, unknown >;
 	capabilities?: {
 		chat_run_status?: boolean;
 		chat_run_cancel?: boolean;
@@ -880,7 +879,6 @@ export default function AgentChat( {
 	loadingMessages = true,
 	persistenceCta,
 	messageSuggestions,
-	chatContext,
 	capabilities,
 	operatorDiagnosticsEnabled,
 }: AgentChatProps ) {
@@ -933,13 +931,6 @@ export default function AgentChat( {
 				capabilities
 			),
 		[ agentFetch, basePath, capabilities ]
-	);
-	const messageMetadata = useMemo(
-		() =>
-			chatContext && Object.keys( chatContext ).length > 0
-				? { chat_context: chatContext }
-				: undefined,
-		[ chatContext ]
 	);
 	const open = useCallback( () => setIsOpen( true ), [] );
 	const close = useCallback( () => {

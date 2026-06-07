@@ -54,7 +54,6 @@ declare global {
 				actionUrl?: string;
 			};
 			messageSuggestions?: ChatMessageSuggestion[];
-			chatContext?: Record< string, unknown >;
 			capabilities?: {
 				chat_run_status?: boolean;
 				chat_run_cancel?: boolean;
@@ -112,7 +111,6 @@ function init(): void {
 			loadingMessages: config.loadingMessages ?? true,
 			persistenceCta: config.persistenceCta,
 			messageSuggestions: config.messageSuggestions,
-			chatContext: config.chatContext,
 			capabilities: config.capabilities,
 			operatorDiagnosticsEnabled: config.operatorDiagnosticsEnabled,
 		} )
