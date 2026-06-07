@@ -331,6 +331,7 @@ function createAgentFetch(
 	return ( options ) => {
 		const method = options.method ?? 'GET';
 		const separator = options.path.includes( '?' ) ? '&' : '?';
+		const hasAgentParam = /[?&]agent=/.test( options.path );
 		const data =
 			options.data &&
 			typeof options.data === 'object' &&
@@ -340,7 +341,7 @@ function createAgentFetch(
 
 		return apiFetch( {
 			path:
-				method === 'GET' || method === 'DELETE'
+				( method === 'GET' || method === 'DELETE' ) && ! hasAgentParam
 					? `${
 							options.path
 					  }${ separator }agent=${ encodeURIComponent( agentSlug ) }`
