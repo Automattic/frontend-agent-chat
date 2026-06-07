@@ -19,9 +19,10 @@
  */
 import {
 	createAgentsApiChatAdapter,
+	renderToolGroups,
 	useAgentsApiChat,
 	normalizeRunEvent,
-} from '@automattic/agenttic-client';
+} from '@automattic/agenttic-client/agents-api';
 import type {
 	AgentsApiFetch as FetchFn,
 	AgentsApiMediaUpload as MediaUploadFn,
@@ -32,7 +33,7 @@ import type {
 	AgentsApiRunEvent as ChatRunEvent,
 	AgentsApiToolGroup,
 	AgentsApiToolRenderers,
-} from '@automattic/agenttic-client';
+} from '@automattic/agenttic-client/agents-api';
 import { AgentUI } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
@@ -89,6 +90,8 @@ interface AgentChatProps {
 		actionUrl?: string;
 	};
 	messageSuggestions?: ChatMessageSuggestion[];
+	chatContext?: Record< string, unknown >;
+	canUploadFiles?: boolean;
 	capabilities?: {
 		chat_run_status?: boolean;
 		chat_run_cancel?: boolean;
@@ -161,7 +164,7 @@ function getToolPayload( group: AgentsApiToolGroup ): Record< string, unknown > 
 	if ( result && typeof result === 'object' ) {
 		return result as Record< string, unknown >;
 	}
-	const raw = group.result?.message.raw ?? group.call?.message.raw ?? {};
+	const raw = group.result?.message?.raw ?? group.call?.message?.raw ?? {};
 	return raw && typeof raw === 'object' ? raw : {};
 }
 
@@ -321,7 +324,10 @@ function getPageContext(): Record< string, string > {
 	return context;
 }
 
-function createAgentFetch( agentSlug: string ): FetchFn {
+function createAgentFetch(
+	agentSlug: string,
+	chatContext?: Record< string, unknown >
+): FetchFn {
 	return ( options ) => {
 		const method = options.method ?? 'GET';
 		const separator = options.path.includes( '?' ) ? '&' : '?';
@@ -342,7 +348,19 @@ function createAgentFetch( agentSlug: string ): FetchFn {
 			method: options.method,
 			data:
 				method === 'POST'
-					? { ...getPageContext(), ...data, agent: agentSlug }
+					? {
+							...getPageContext(),
+							...data,
+							agent: agentSlug,
+							client_context: {
+								...( data.client_context &&
+								typeof data.client_context === 'object' &&
+								! Array.isArray( data.client_context )
+									? ( data.client_context as Record< string, unknown > )
+									: {} ),
+								...( chatContext ?? {} ),
+							},
+						}
 					: options.data,
 			headers: options.headers,
 		} );
@@ -879,6 +897,8 @@ export default function AgentChat( {
 	loadingMessages = true,
 	persistenceCta,
 	messageSuggestions,
+	chatContext,
+	canUploadFiles = false,
 	capabilities,
 	operatorDiagnosticsEnabled,
 }: AgentChatProps ) {
@@ -917,9 +937,10 @@ export default function AgentChat( {
 	const activeAgentDescription =
 		selectedAgent?.description ?? agentDescription;
 	const agentFetch = useMemo(
-		() => createAgentFetch( activeAgentSlug ),
-		[ activeAgentSlug ]
+		() => createAgentFetch( activeAgentSlug, chatContext ),
+		[ activeAgentSlug, chatContext ]
 	);
+	const chatStorageReady = isLoggedIn || browserBootstrapReady;
 	const canShowOperatorDiagnostics =
 		!! operatorDiagnosticsEnabled || !! capabilities?.operator_diagnostics;
 	const runAdapter = useMemo(
@@ -1195,7 +1216,33 @@ export default function AgentChat( {
 			insert_content: diffRenderer,
 			present_question: questionRenderer,
 		};
-	}, [] );
+	}, [ resolvePendingAction ] );
+	const emptyView = useMemo(
+		() =>
+			createElement(
+				'div',
+				{ className: 'frontend-agent-chat__empty' },
+				createElement( 'h3', null, activeAgentName ),
+				createElement( 'p', null, activeAgentDescription )
+			),
+		[ activeAgentDescription, activeAgentName ]
+	);
+	const acceptedFileTypes = useMemo(
+		() => [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ],
+		[]
+	);
+	const thinkingMessage = useMemo( () => {
+		if ( loadingMessages === false ) {
+			return undefined;
+		}
+		if (
+			typeof loadingMessages === 'object' &&
+			loadingMessages.messages?.length
+		) {
+			return loadingMessages.messages[ 0 ];
+		}
+		return __( 'Working…', 'frontend-agent-chat' );
+	}, [ loadingMessages ] );
 	const renderChatHeader = useCallback( () => {
 		const retrievalStateNode = renderRetrievalState( retrievalState );
 		const operatorDiagnosticsNode = canShowOperatorDiagnostics
@@ -1220,23 +1267,79 @@ export default function AgentChat( {
 	const chatAdapter = useMemo(
 		() =>
 			createAgentsApiChatAdapter( {
+				agent: activeAgentSlug,
 				basePath,
 				fetchFn: agentFetch,
 			} ),
-		[ agentFetch, basePath ]
+		[ activeAgentSlug, agentFetch, basePath ]
 	);
 	const chat = useAgentsApiChat( {
 		adapter: chatAdapter,
-		toolRenderers,
-		mediaUploadFn: wpMediaUpload,
+		mediaUploadFn: canUploadFiles ? wpMediaUpload : undefined,
 		runAdapter,
 		getRunId,
 		onMessage: handleMessage,
 		onError: handleError,
 		onResponseMetadata: handleResponseMetadata,
 		onUnreadChange: setUnreadCount,
-		isVisible: isOpen,
+		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
 	} );
+	const displayMessages = useMemo(
+		() =>
+			chat.messages.map( ( message ) => {
+				const toolName = String(
+					message.raw?.tool_name ?? message.raw?.name ?? ''
+				);
+				if ( ! toolName ) {
+					return message;
+				}
+
+				const renderedTools = renderToolGroups(
+					[
+						{
+							id: message.id,
+							name: toolName,
+							result: {
+								id: message.id,
+								message,
+								result:
+									message.raw && typeof message.raw === 'object'
+										? message.raw
+										: {},
+							},
+						},
+					],
+					toolRenderers
+				).filter( Boolean );
+
+				if ( renderedTools.length === 0 ) {
+					return message;
+				}
+
+				const ToolComponent = () =>
+					createElement( 'div', null, ...renderedTools );
+
+				return {
+					...message,
+					content: [
+						{
+							type: 'component' as const,
+							component: ToolComponent,
+						},
+					],
+				};
+			} ),
+		[ chat.messages, toolRenderers ]
+	);
+	const submitMessage = useCallback(
+		( message: string, files?: File[] ) =>
+			chat.sendMessage( message, canUploadFiles ? files : undefined ),
+		[ canUploadFiles, chat.sendMessage ]
+	);
+	useEffect( () => {
+		chat.newSession();
+		setUnreadCount( 0 );
+	}, [ activeAgentSlug, chat.newSession ] );
 	const hasPersistenceCta = !! (
 		persistenceCta?.message ||
 		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
@@ -1247,7 +1350,6 @@ export default function AgentChat( {
 				'frontend-agent-chat'
 		  )
 		: persistenceCta?.message;
-	const chatStorageReady = isLoggedIn || browserBootstrapReady;
 	const showSessionControls = chatStorageReady && activeAgentSlug;
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
@@ -1450,31 +1552,22 @@ export default function AgentChat( {
 					chatStorageReady &&
 					createElement( AgentUI, {
 						key: activeAgentSlug,
-						messages: chat.messages,
+						messages: displayMessages,
 						isProcessing: chat.isProcessing,
-						error: chat.error?.message ?? null,
-						onSubmit: ( message: string, files?: File[] ) =>
-							chat.sendMessage( message, files ),
+						error: chat.error,
+						onSubmit: submitMessage,
 						onStop: chat.cancelRun,
 						placeholder: sprintf(
 							/* translators: %s: agent name. */
 							__( 'Ask %s anything…', 'frontend-agent-chat' ),
 							activeAgentName
 						),
-						emptyView: createElement(
-							'div',
-							{ className: 'frontend-agent-chat__empty' },
-							createElement( 'h3', null, activeAgentName ),
-							createElement( 'p', null, activeAgentDescription )
-						),
+						emptyView,
 						suggestions: messageSuggestions,
 						clearSuggestions: () => undefined,
-						thinkingMessage:
-							loadingMessages === false
-								? undefined
-								: __( 'Working…', 'frontend-agent-chat' ),
-						allowAttachments: true,
-						acceptedFileTypes: [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ],
+						thinkingMessage,
+						allowAttachments: canUploadFiles,
+						acceptedFileTypes,
 					} )
 			)
 		)

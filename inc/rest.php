@@ -162,6 +162,71 @@ function frontend_agent_chat_register_rest_routes(): void {
 add_action( 'rest_api_init', 'frontend_agent_chat_register_rest_routes' );
 
 /**
+ * Sanitize client context forwarded by the browser widget.
+ *
+ * @param mixed $context Raw client context.
+ * @return array<string,mixed> Sanitized context.
+ */
+function frontend_agent_chat_rest_sanitize_client_context( $context ): array {
+	if ( ! is_array( $context ) ) {
+		return array();
+	}
+
+	$sanitized = array();
+	foreach ( $context as $key => $value ) {
+		$key = sanitize_key( (string) $key );
+		if ( '' === $key ) {
+			continue;
+		}
+
+		if ( is_bool( $value ) || is_int( $value ) || is_float( $value ) ) {
+			$sanitized[ $key ] = $value;
+			continue;
+		}
+
+		if ( is_string( $value ) ) {
+			$sanitized[ $key ] = sanitize_text_field( $value );
+			continue;
+		}
+
+		if ( is_array( $value ) ) {
+			$items = array();
+			foreach ( $value as $item ) {
+				if ( is_scalar( $item ) ) {
+					$items[] = sanitize_text_field( (string) $item );
+				}
+			}
+			if ( ! empty( $items ) ) {
+				$sanitized[ $key ] = $items;
+			}
+		}
+	}
+
+	return $sanitized;
+}
+
+/**
+ * Merge request client context into a canonical chat input.
+ *
+ * @param array           $input   Chat or queue input.
+ * @param WP_REST_Request $request REST request.
+ * @return array Updated input.
+ */
+function frontend_agent_chat_rest_add_request_client_context( array $input, WP_REST_Request $request ): array {
+	$request_context = frontend_agent_chat_rest_sanitize_client_context( $request->get_param( 'client_context' ) );
+	if ( empty( $request_context ) ) {
+		return $input;
+	}
+
+	$input['client_context'] = array_merge(
+		is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array(),
+		$request_context
+	);
+
+	return $input;
+}
+
+/**
  * Bootstrap browser-scoped state before anonymous session APIs are used.
  *
  * @return WP_REST_Response
@@ -364,6 +429,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 			'connector_id' => 'frontend-agent-chat',
 		),
 	);
+	$chat_input = frontend_agent_chat_rest_add_request_client_context( $chat_input, $request );
 
 	/**
 	 * Filter the canonical agents/chat input sent by the frontend chat widget.
@@ -558,6 +624,7 @@ function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
 			'connector_id' => 'frontend-agent-chat',
 		),
 	);
+	$queue_input = frontend_agent_chat_rest_add_request_client_context( $queue_input, $request );
 
 	/**
 	 * Filter the canonical agents/queue-chat-message input sent by the frontend chat widget.

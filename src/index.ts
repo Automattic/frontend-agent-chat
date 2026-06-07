@@ -54,6 +54,8 @@ declare global {
 				actionUrl?: string;
 			};
 			messageSuggestions?: ChatMessageSuggestion[];
+			chatContext?: Record< string, unknown >;
+			canUploadFiles?: boolean;
 			capabilities?: {
 				chat_run_status?: boolean;
 				chat_run_cancel?: boolean;
@@ -111,6 +113,8 @@ function init(): void {
 			loadingMessages: config.loadingMessages ?? true,
 			persistenceCta: config.persistenceCta,
 			messageSuggestions: config.messageSuggestions,
+			chatContext: config.chatContext,
+			canUploadFiles: config.canUploadFiles ?? false,
 			capabilities: config.capabilities,
 			operatorDiagnosticsEnabled: config.operatorDiagnosticsEnabled,
 		} )

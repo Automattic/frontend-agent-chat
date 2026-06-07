@@ -48,7 +48,7 @@ function frontend_agent_chat_sanitize_svg_view_box( $view_box ): string {
  * Sanitize message suggestions for the frontend chat UI.
  *
  * @param mixed $suggestions Raw suggestion config.
- * @return array<int,array{label:string,message?:string,description?:string}> Sanitized suggestions.
+ * @return array<int,array{id:string,label:string,prompt?:string,autoSubmit?:bool}> Sanitized suggestions.
  */
 function frontend_agent_chat_sanitize_message_suggestions( $suggestions ): array {
 	if ( ! is_array( $suggestions ) ) {
@@ -66,16 +66,18 @@ function frontend_agent_chat_sanitize_message_suggestions( $suggestions ): array
 			continue;
 		}
 
-		$item = array( 'label' => $label );
+		$item = array(
+			'id'    => sanitize_title( $label ),
+			'label' => $label,
+		);
 
 		$message = sanitize_textarea_field( (string) ( $suggestion['message'] ?? '' ) );
 		if ( '' !== $message ) {
-			$item['message'] = $message;
+			$item['prompt'] = $message;
 		}
 
-		$description = sanitize_text_field( (string) ( $suggestion['description'] ?? '' ) );
-		if ( '' !== $description ) {
-			$item['description'] = $description;
+		if ( isset( $suggestion['auto_submit'] ) || isset( $suggestion['autoSubmit'] ) ) {
+			$item['autoSubmit'] = (bool) ( $suggestion['auto_submit'] ?? $suggestion['autoSubmit'] );
 		}
 
 		$sanitized[] = $item;
@@ -205,6 +207,7 @@ function frontend_agent_chat_enqueue() {
 		'expandIconViewBox'          => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),
 		'layout'                     => 'inline' === ( $config['layout'] ?? '' ) ? 'inline' : 'floating',
 		'isLoggedIn'                 => is_user_logged_in(),
+		'canUploadFiles'             => is_user_logged_in() && current_user_can( 'upload_files' ),
 		'capabilities'               => $capabilities,
 		'operatorDiagnosticsEnabled' => ! empty( $config['operator_diagnostics'] ) || ! empty( $capabilities['operator_diagnostics'] ),
 	);
