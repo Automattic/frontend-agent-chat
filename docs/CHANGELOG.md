@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.11.1] - 2026-06-13
+
+### Changed
+- Support brain-aware chat metadata
+
 ## [0.11.0] - 2026-06-04
 
 ### Added
