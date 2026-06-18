@@ -358,11 +358,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 		'message'        => $message,
 		'session_id'     => $session_id,
 		'attachments'    => is_array( $attachments ) ? $attachments : array(),
-		'client_context' => array(
-			'source'       => 'rest',
-			'client_name'  => 'frontend-agent-chat',
-			'connector_id' => 'frontend-agent-chat',
-		),
+		'client_context' => frontend_agent_chat_build_client_context( $request ),
 	);
 
 	/**
@@ -552,11 +548,7 @@ function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
 		'run_id'         => sanitize_text_field( (string) $request->get_param( 'run_id' ) ),
 		'message'        => $message,
 		'attachments'    => is_array( $attachments ) ? $attachments : array(),
-		'client_context' => array(
-			'source'       => 'rest',
-			'client_name'  => 'frontend-agent-chat',
-			'connector_id' => 'frontend-agent-chat',
-		),
+		'client_context' => frontend_agent_chat_build_client_context( $request ),
 	);
 
 	/**
@@ -1259,4 +1251,74 @@ function frontend_agent_chat_first_user_message( array $messages ): string {
 		}
 	}
 	return '';
+}
+
+/**
+ * Build the canonical client_context for an outgoing chat input.
+ *
+ * Reads any browser-supplied client_context from the request body, sanitizes it
+ * defensively (it is untrusted input that feeds a prompt directive), and merges
+ * the server-owned identity fields on top so they always win. Browser-supplied
+ * keys such as `active_context` survive the merge so downstream consumers can
+ * read the caller's live context.
+ *
+ * This carries the browser's context through generically: it does not interpret
+ * or special-case any particular product, surface, or agent. Downstream tools
+ * are responsible for re-verifying ownership and authorization.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return array Canonical client_context.
+ */
+function frontend_agent_chat_build_client_context( WP_REST_Request $request ): array {
+	$incoming = $request->get_param( 'client_context' );
+	$incoming = is_array( $incoming ) ? frontend_agent_chat_sanitize_client_context( $incoming ) : array();
+
+	return array_merge(
+		$incoming,
+		array(
+			'source'       => 'rest',
+			'client_name'  => 'frontend-agent-chat',
+			'connector_id' => 'frontend-agent-chat',
+		)
+	);
+}
+
+/**
+ * Recursively sanitize an untrusted client_context payload.
+ *
+ * Scalar string values are run through sanitize_textarea_field() (newlines in
+ * excerpts are preserved) and capped to a defensive maximum length so an
+ * oversized payload cannot bloat the prompt.
+ * Arrays are walked recursively; non-scalar, non-array values are dropped.
+ *
+ * @param array $context Raw client_context from the request body.
+ * @param int   $depth   Current recursion depth (internal).
+ * @return array Sanitized client_context.
+ */
+function frontend_agent_chat_sanitize_client_context( array $context, int $depth = 0 ): array {
+	$max_depth      = 6;
+	$max_str_length = 4000;
+	$sanitized      = array();
+
+	foreach ( $context as $key => $value ) {
+		$clean_key = is_string( $key ) ? sanitize_key( $key ) : (int) $key;
+
+		if ( is_array( $value ) ) {
+			if ( $depth >= $max_depth ) {
+				continue;
+			}
+			$sanitized[ $clean_key ] = frontend_agent_chat_sanitize_client_context( $value, $depth + 1 );
+		} elseif ( is_string( $value ) ) {
+			$clean = sanitize_textarea_field( $value );
+			if ( strlen( $clean ) > $max_str_length ) {
+				$clean = substr( $clean, 0, $max_str_length );
+			}
+			$sanitized[ $clean_key ] = $clean;
+		} elseif ( is_int( $value ) || is_float( $value ) || is_bool( $value ) ) {
+			$sanitized[ $clean_key ] = $value;
+		}
+		// Drop nulls, objects, and resources.
+	}
+
+	return $sanitized;
 }
