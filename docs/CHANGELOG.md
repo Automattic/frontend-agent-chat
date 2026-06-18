@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.13.0] - 2026-06-18
+
+### Added
+- emit action-resolved event on pending-action resolve
+
 ## [0.12.0] - 2026-06-18
 
 ### Added
