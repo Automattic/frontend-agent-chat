@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.12.0] - 2026-06-18
+
+### Added
+- pass browser-sent client_context through to the agent
+
 ## [0.11.1] - 2026-06-13
 
 ### Changed
