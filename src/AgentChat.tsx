@@ -197,10 +197,15 @@ interface ActionResolvedDetail {
 }
 
 /**
- * Pull a scalar value (string or number) for `key` from anywhere it commonly
- * appears in a resolve response: the top-level data object, or its nested
- * `result` payload. Resolve responses are shaped by the concrete handler, so
- * this stays defensive rather than assuming one layout.
+ * Pull a scalar value (string or number) for `key` from a resolve response.
+ *
+ * The resolve response is wrapped in NESTED `result` envelopes: the agents-api
+ * resolver returns `{ action_id, decision, result }`, whose `result` is itself
+ * `{ success, kind, result }`, whose innermost `result` is the concrete apply
+ * handler's output (where `post_id` actually lives). The exact depth and shape
+ * are owned by the concrete handler, not this plugin, so we walk each object +
+ * its chain of `result` children to whatever depth the field appears at. This
+ * stays defensive rather than assuming one fixed layout.
  *
  * @param data Parsed resolve response `data` object.
  * @param key  Field name to extract.
@@ -210,20 +215,22 @@ function readResolvedScalar(
 	data: Record< string, unknown > | undefined,
 	key: string
 ): number | string | undefined {
-	if ( ! data || typeof data !== 'object' ) {
-		return undefined;
-	}
+	// Bounded depth so a self-referential payload cannot loop forever.
+	const MAX_DEPTH = 6;
+	let node: unknown = data;
 
-	const candidates: unknown[] = [ data[ key ] ];
-	const result = data.result;
-	if ( result && typeof result === 'object' ) {
-		candidates.push( ( result as Record< string, unknown > )[ key ] );
-	}
+	for ( let depth = 0; depth < MAX_DEPTH; depth++ ) {
+		if ( ! node || typeof node !== 'object' ) {
+			return undefined;
+		}
 
-	for ( const candidate of candidates ) {
+		const candidate = ( node as Record< string, unknown > )[ key ];
 		if ( typeof candidate === 'number' || typeof candidate === 'string' ) {
 			return candidate;
 		}
+
+		// Descend into the nested result envelope, if present.
+		node = ( node as Record< string, unknown > ).result;
 	}
 
 	return undefined;
