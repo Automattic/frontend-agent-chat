@@ -181,11 +181,81 @@ const DEFAULT_EXPAND_ICON_PATH = 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
 const DEFAULT_COLLAPSE_ICON_PATH = 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5';
 
 /**
+ * `detail` payload of the `frontend-agent-chat:action-resolved` event.
+ *
+ * Carries the resolved action id + decision, plus whatever resource identity
+ * the resolve response exposed (`post_id`, `blog_id`, `kind`). The plugin makes
+ * no assumptions about who consumes this; it only announces that a pending
+ * action resolved on the DOM.
+ */
+interface ActionResolvedDetail {
+	action_id: string;
+	decision: 'accepted' | 'rejected';
+	post_id?: number | string;
+	blog_id?: number | string;
+	kind?: string;
+}
+
+/**
+ * Pull a scalar value (string or number) for `key` from anywhere it commonly
+ * appears in a resolve response: the top-level data object, or its nested
+ * `result` payload. Resolve responses are shaped by the concrete handler, so
+ * this stays defensive rather than assuming one layout.
+ *
+ * @param data Parsed resolve response `data` object.
+ * @param key  Field name to extract.
+ * @return The first scalar value found, or undefined.
+ */
+function readResolvedScalar(
+	data: Record< string, unknown > | undefined,
+	key: string
+): number | string | undefined {
+	if ( ! data || typeof data !== 'object' ) {
+		return undefined;
+	}
+
+	const candidates: unknown[] = [ data[ key ] ];
+	const result = data.result;
+	if ( result && typeof result === 'object' ) {
+		candidates.push( ( result as Record< string, unknown > )[ key ] );
+	}
+
+	for ( const candidate of candidates ) {
+		if ( typeof candidate === 'number' || typeof candidate === 'string' ) {
+			return candidate;
+		}
+	}
+
+	return undefined;
+}
+
+/**
+ * Announce that a pending action resolved by dispatching a generic `window`
+ * CustomEvent. The plugin does not know who listens — a host adapter may
+ * translate this into its own editor-refresh signal.
+ *
+ * @param detail Resolved action detail.
+ */
+function dispatchActionResolved( detail: ActionResolvedDetail ): void {
+	window.dispatchEvent(
+		new CustomEvent( 'frontend-agent-chat:action-resolved', {
+			detail,
+		} )
+	);
+}
+
+/**
  * Resolve a pending action by id.
  *
  * The server route dispatches to the canonical `agents/resolve-pending-action`
  * ability so tool preview resolution stays independent from the concrete
  * runtime/store implementation.
+ *
+ * On a SUCCESSFUL resolution, a generic `frontend-agent-chat:action-resolved`
+ * window event is dispatched carrying the action id, decision, and whatever
+ * resource identity the resolve response surfaced. The plugin only announces
+ * the resolution; it has no knowledge of any host editor that may refresh in
+ * response.
  *
  * @param actionId Pending action ID.
  * @param decision Resolution decision.
@@ -198,14 +268,48 @@ function resolvePendingAction(
 		path: '/frontend-agent-chat/v1/chat/actions/resolve',
 		method: 'POST',
 		data: { action_id: actionId, decision },
-	} ).catch( ( err: unknown ) => {
-		// eslint-disable-next-line no-console
-		console.error(
-			'AgentChat: failed to resolve pending action',
-			actionId,
-			err
-		);
-	} );
+	} )
+		.then( ( response: unknown ) => {
+			const data =
+				response && typeof response === 'object'
+					? ( ( response as { data?: unknown } ).data as
+							| Record< string, unknown >
+							| undefined )
+					: undefined;
+
+			// Only emit on a successful resolution. A failed resolve never
+			// changed the post, so there is nothing for a host to refresh.
+			if ( data && data.success === false ) {
+				return;
+			}
+
+			const detail: ActionResolvedDetail = {
+				action_id: actionId,
+				decision,
+			};
+			const postId = readResolvedScalar( data, 'post_id' );
+			const blogId = readResolvedScalar( data, 'blog_id' );
+			const kind = readResolvedScalar( data, 'kind' );
+			if ( postId !== undefined ) {
+				detail.post_id = postId;
+			}
+			if ( blogId !== undefined ) {
+				detail.blog_id = blogId;
+			}
+			if ( typeof kind === 'string' ) {
+				detail.kind = kind;
+			}
+
+			dispatchActionResolved( detail );
+		} )
+		.catch( ( err: unknown ) => {
+			// eslint-disable-next-line no-console
+			console.error(
+				'AgentChat: failed to resolve pending action',
+				actionId,
+				err
+			);
+		} );
 }
 
 /**
