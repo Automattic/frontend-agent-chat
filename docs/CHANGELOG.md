@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.1] - 2026-06-19
+
+### Changed
+- Bump chat renderer dependency
+
+### Fixed
+- bump @extrachill/chat to 0.15.1 for rich question choice presentations
+
 ## [0.14.0] - 2026-06-19
 
 ### Added
