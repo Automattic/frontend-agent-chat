@@ -35,7 +35,11 @@ import type {
 	AgentsApiToolRenderers,
 	AgentsApiToolGroup,
 } from '@automattic/agenttic-client/agents-api';
-import { AgentUI, QuestionCard } from '@automattic/agenttic-ui/embedded-agent-ui';
+import {
+	AgentUI,
+	EmbeddedAgentUISuggestions,
+	QuestionCard,
+} from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
 
@@ -1147,7 +1151,12 @@ export default function AgentChat( {
 				'div',
 				{ className: 'frontend-agent-chat__empty' },
 				createElement( 'h3', null, activeAgentName ),
-				createElement( 'p', null, activeAgentDescription )
+				createElement( 'p', null, activeAgentDescription ),
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__starter-suggestions' },
+					createElement( EmbeddedAgentUISuggestions )
+				)
 			),
 		[ activeAgentDescription, activeAgentName ]
 	);
@@ -1568,25 +1577,39 @@ export default function AgentChat( {
 				renderChatHeader(),
 				activeAgentSlug &&
 					chatStorageReady &&
-					createElement( AgentUI, {
-						key: activeAgentSlug,
-						messages: displayMessages,
-						isProcessing: chat.isProcessing,
-						error: chat.error,
-						onSubmit: submitMessage,
-						onStop: chat.cancelRun,
-						placeholder: sprintf(
-							/* translators: %s: agent name. */
-							__( 'Ask %s anything…', 'frontend-agent-chat' ),
-							activeAgentName
-						),
-						emptyView,
-						suggestions: messageSuggestions,
-						clearSuggestions: () => undefined,
-						thinkingMessage,
-						allowAttachments: canUploadFiles,
-						acceptedFileTypes,
-					} )
+					createElement(
+						AgentUI.Container,
+						{
+							key: activeAgentSlug,
+							messages: displayMessages,
+							isProcessing: chat.isProcessing,
+							error: chat.error,
+							onSubmit: submitMessage,
+							onStop: chat.cancelRun,
+							placeholder: sprintf(
+								/* translators: %s: agent name. */
+								__( 'Ask %s anything…', 'frontend-agent-chat' ),
+								activeAgentName
+							),
+							emptyView,
+							suggestions: messageSuggestions,
+							clearSuggestions: () => undefined,
+							thinkingMessage,
+							allowAttachments: canUploadFiles,
+							acceptedFileTypes,
+						},
+						createElement(
+							AgentUI.ConversationView,
+							null,
+							createElement( AgentUI.Messages ),
+							createElement(
+								AgentUI.Footer,
+								null,
+								createElement( AgentUI.Notice ),
+								createElement( AgentUI.Input )
+							)
+						)
+					)
 			)
 		)
 	);
