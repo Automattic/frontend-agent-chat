@@ -908,6 +908,7 @@ export default function AgentChat( {
 	const [ isOpen, setIsOpen ] = useState( isInline );
 	const [ isExpanded, setIsExpanded ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
+	const [ loadingMessageIndex, setLoadingMessageIndex ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] =
 		useState( isLoggedIn );
 	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] =
@@ -1154,18 +1155,23 @@ export default function AgentChat( {
 		() => [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ],
 		[]
 	);
-	const thinkingMessage = useMemo( () => {
+	const loadingMessageOptions = useMemo( () => {
 		if ( loadingMessages === false ) {
-			return undefined;
+			return [];
 		}
 		if (
 			typeof loadingMessages === 'object' &&
 			loadingMessages.messages?.length
 		) {
-			return loadingMessages.messages[ 0 ];
+			return loadingMessages.messages;
 		}
-		return __( 'Working…', 'frontend-agent-chat' );
+		return [ __( 'Working…', 'frontend-agent-chat' ) ];
 	}, [ loadingMessages ] );
+	const thinkingMessage = loadingMessageOptions.length
+		? loadingMessageOptions[
+				loadingMessageIndex % loadingMessageOptions.length
+		  ]
+		: undefined;
 	const renderChatHeader = useCallback( () => {
 		const retrievalStateNode = renderRetrievalState( retrievalState );
 		const operatorDiagnosticsNode = canShowOperatorDiagnostics
@@ -1207,6 +1213,23 @@ export default function AgentChat( {
 		onUnreadChange: setUnreadCount,
 		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
 	} );
+	useEffect( () => {
+		if ( ! chat.isProcessing || loadingMessageOptions.length < 2 ) {
+			setLoadingMessageIndex( 0 );
+			return;
+		}
+
+		const interval =
+			typeof loadingMessages === 'object' && loadingMessages.interval
+				? loadingMessages.interval
+				: 2400;
+		const timer = window.setInterval(
+			() => setLoadingMessageIndex( ( index ) => index + 1 ),
+			interval
+		);
+
+		return () => window.clearInterval( timer );
+	}, [ chat.isProcessing, loadingMessages, loadingMessageOptions.length ] );
 	const toolRenderers = useMemo< AgentsApiToolRenderers >( () => {
 		const artifactRenderer = ( group: AgentsApiToolGroup ) => {
 			const payload = parseArtifactStatusPayload( group );
