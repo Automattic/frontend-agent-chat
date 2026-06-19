@@ -10,7 +10,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@extrachill/chat": "^0.14.0",
+		"@extrachill/chat": "github:Extra-Chill/chat#fbb600d28b82c05ac75135955c9f1f6cadc25f07",
 		"@wordpress/element": "^6.46.0",
 		"@wordpress/i18n": "^6.21.0"
 	},
