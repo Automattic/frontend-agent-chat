@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.13.2] - 2026-06-18
+
+### Changed
+- Use published chat package release
+
 ## [0.13.1] - 2026-06-18
 
 ### Changed
