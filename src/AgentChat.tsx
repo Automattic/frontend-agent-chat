@@ -36,6 +36,7 @@ import type {
 	FetchFn,
 	MediaUploadFn,
 	QueueMessageResult,
+	ShapeRenderer,
 } from '@extrachill/chat';
 import type { ChangeEvent, ReactNode } from 'react';
 
@@ -1148,9 +1149,24 @@ export default function AgentChat( {
 			edit_post_blocks: diffRenderer,
 			replace_post_blocks: diffRenderer,
 			insert_content: diffRenderer,
+			// Kept name-keyed for back-compat with the explicit
+			// `present_question` tool. Any *other* tool that returns a
+			// `{question, choices}` payload is handled by `shapeRenderers`
+			// below — no tool name is hardcoded for that generic path.
 			present_question: questionRenderer,
 		};
 	}, [] );
+
+	// Shape-based renderers dispatch off the *shape* of a tool result rather
+	// than its tool name. `createQuestionToolRenderer` returns `null` when a
+	// group has no `{question, choices}` payload, so any tool that carries that
+	// shape — present_question, file_feature_request, or any future
+	// candidate-producing tool — renders a QuestionCard with zero hardcoded
+	// tool names in this generic shell (extrachill-roadie#61).
+	const shapeRenderers = useMemo< ShapeRenderer[] >(
+		() => [ createQuestionToolRenderer() ],
+		[]
+	);
 	const renderChatHeader = useCallback( () => {
 		const retrievalStateNode = renderRetrievalState( retrievalState );
 		const operatorDiagnosticsNode = canShowOperatorDiagnostics
@@ -1332,6 +1348,7 @@ export default function AgentChat( {
 						showTools: true,
 						showSessions: true,
 						toolRenderers,
+						shapeRenderers,
 						placeholder: sprintf(
 							/* translators: %s: agent name. */
 							__( 'Ask %s anything…', 'frontend-agent-chat' ),
