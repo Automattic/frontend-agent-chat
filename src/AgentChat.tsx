@@ -19,6 +19,7 @@
  */
 import {
 	createAgentsApiChatAdapter,
+	createPresentQuestionToolRenderers,
 	renderToolGroups,
 	useAgentsApiChat,
 	normalizeRunEvent,
@@ -31,10 +32,10 @@ import type {
 	AgentsApiRunAdapter as ChatRunAdapter,
 	AgentsApiRunCapabilities as ChatRunCapabilities,
 	AgentsApiRunEvent as ChatRunEvent,
-	AgentsApiToolGroup,
 	AgentsApiToolRenderers,
+	AgentsApiToolGroup,
 } from '@automattic/agenttic-client/agents-api';
-import { AgentUI } from '@automattic/agenttic-ui/embedded-agent-ui';
+import { AgentUI, QuestionCard } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
 
@@ -1139,85 +1140,6 @@ export default function AgentChat( {
 		return () => document.removeEventListener( 'keydown', handleKeyDown );
 	}, [ isExpanded, isInline, isOpen ] );
 
-	const toolRenderers = useMemo< AgentsApiToolRenderers >( () => {
-		const artifactRenderer = ( group: AgentsApiToolGroup ) => {
-			const payload = parseArtifactStatusPayload( group );
-			return payload
-				? renderArtifactStatusPayload( payload )
-				: createElement(
-						'pre',
-						{ className: 'frontend-agent-chat__tool-card' },
-						JSON.stringify( getToolPayload( group ), null, 2 )
-				  );
-		};
-		const diffRenderer = ( group: AgentsApiToolGroup ) => {
-			const payload = getToolPayload( group );
-			const actionId = String(
-				payload.action_id ?? payload.actionId ?? payload.pending_action_id ?? ''
-			);
-			return createElement(
-				'div',
-				{ className: 'frontend-agent-chat__tool-card' },
-				createElement(
-					'div',
-					{ className: 'frontend-agent-chat__tool-card-title' },
-					String( payload.title ?? group.name )
-				),
-				createElement(
-					'pre',
-					null,
-					JSON.stringify( payload.diff ?? payload, null, 2 )
-				),
-				actionId &&
-					createElement(
-						'div',
-						{ className: 'frontend-agent-chat__tool-card-actions' },
-						createElement(
-							'button',
-							{
-								type: 'button',
-								onClick: () =>
-									resolvePendingAction( actionId, 'accepted' ),
-							},
-							__( 'Accept', 'frontend-agent-chat' )
-						),
-						createElement(
-							'button',
-							{
-								type: 'button',
-								onClick: () =>
-									resolvePendingAction( actionId, 'rejected' ),
-							},
-							__( 'Reject', 'frontend-agent-chat' )
-						)
-					)
-			);
-		};
-		const questionRenderer = ( group: AgentsApiToolGroup ) => {
-			const payload = getToolPayload( group );
-			return createElement(
-				'div',
-				{ className: 'frontend-agent-chat__tool-card' },
-				createElement(
-					'div',
-					{ className: 'frontend-agent-chat__tool-card-title' },
-					String( payload.question ?? payload.title ?? group.name )
-				)
-			);
-		};
-
-		return {
-			artifact_phase: artifactRenderer,
-			start_artifact_generation: artifactRenderer,
-			artifact_status: artifactRenderer,
-			artifact_status_update: artifactRenderer,
-			artifact_task_status: artifactRenderer,
-			edit_post_blocks: diffRenderer,
-			replace_post_blocks: diffRenderer,
-			insert_content: diffRenderer,
-			present_question: questionRenderer,
-		};
-	}, [ resolvePendingAction ] );
 	const emptyView = useMemo(
 		() =>
 			createElement(
@@ -1285,6 +1207,78 @@ export default function AgentChat( {
 		onUnreadChange: setUnreadCount,
 		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
 	} );
+	const toolRenderers = useMemo< AgentsApiToolRenderers >( () => {
+		const artifactRenderer = ( group: AgentsApiToolGroup ) => {
+			const payload = parseArtifactStatusPayload( group );
+			return payload
+				? renderArtifactStatusPayload( payload )
+				: createElement(
+						'pre',
+						{ className: 'frontend-agent-chat__tool-card' },
+						JSON.stringify( getToolPayload( group ), null, 2 )
+				  );
+		};
+		const diffRenderer = ( group: AgentsApiToolGroup ) => {
+			const payload = getToolPayload( group );
+			const actionId = String(
+				payload.action_id ?? payload.actionId ?? payload.pending_action_id ?? ''
+			);
+			return createElement(
+				'div',
+				{ className: 'frontend-agent-chat__tool-card' },
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__tool-card-title' },
+					String( payload.title ?? group.name )
+				),
+				createElement(
+					'pre',
+					null,
+					JSON.stringify( payload.diff ?? payload, null, 2 )
+				),
+				actionId &&
+					createElement(
+						'div',
+						{ className: 'frontend-agent-chat__tool-card-actions' },
+						createElement(
+							'button',
+							{
+								type: 'button',
+								onClick: () =>
+									resolvePendingAction( actionId, 'accepted' ),
+							},
+							__( 'Accept', 'frontend-agent-chat' )
+						),
+						createElement(
+							'button',
+							{
+								type: 'button',
+								onClick: () =>
+									resolvePendingAction( actionId, 'rejected' ),
+							},
+							__( 'Reject', 'frontend-agent-chat' )
+						)
+					)
+			);
+		};
+		const questionRenderers = createPresentQuestionToolRenderers( {
+			QuestionCard,
+			disabled: () => chat.isProcessing,
+			onAnswer: ( answer ) => chat.sendMessage( answer ),
+		} );
+
+		return {
+			artifact_phase: artifactRenderer,
+			start_artifact_generation: artifactRenderer,
+			artifact_status: artifactRenderer,
+			artifact_status_update: artifactRenderer,
+			artifact_task_status: artifactRenderer,
+			edit_post_blocks: diffRenderer,
+			replace_post_blocks: diffRenderer,
+			insert_content: diffRenderer,
+			...questionRenderers,
+		};
+	}, [ chat.isProcessing, chat.sendMessage ] );
 	const displayMessages = useMemo(
 		() =>
 			chat.messages.map( ( message ) => {
