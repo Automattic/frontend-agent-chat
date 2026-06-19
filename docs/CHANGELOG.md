@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.13.1] - 2026-06-18
+
+### Changed
+- Use chat package without question freeform input
+
 ## [0.13.0] - 2026-06-18
 
 ### Added
