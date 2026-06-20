@@ -20,6 +20,7 @@
 import {
 	createAgentsApiChatAdapter,
 	createPresentQuestionToolRenderers,
+	groupToolMessages,
 	renderToolGroups,
 	useAgentsApiChat,
 	normalizeRunEvent,
@@ -1314,28 +1315,13 @@ export default function AgentChat( {
 	const displayMessages = useMemo(
 		() =>
 			chat.messages.map( ( message ) => {
-				const toolName = String(
-					message.raw?.tool_name ?? message.raw?.name ?? ''
-				);
-				if ( ! toolName ) {
+				const toolGroups = groupToolMessages( [ message ] );
+				if ( toolGroups.length === 0 ) {
 					return message;
 				}
 
 				const renderedTools = renderToolGroups(
-					[
-						{
-							id: message.id,
-							name: toolName,
-							result: {
-								id: message.id,
-								message,
-								result:
-									message.raw && typeof message.raw === 'object'
-										? message.raw
-										: {},
-							},
-						},
-					],
+					toolGroups,
 					toolRenderers
 				).filter( Boolean );
 
