@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.1] - 2026-06-19
+
+### Changed
+- Bump chat renderer dependency
+
+### Fixed
+- bump @extrachill/chat to 0.15.1 for rich question choice presentations
+
+## [0.14.0] - 2026-06-19
+
+### Added
+- render question cards by result shape, not tool name
+
+### Fixed
+- bump @extrachill/chat to 0.14.2 for answerable present_question cards
+
 ## [0.13.2] - 2026-06-18
 
 ### Changed
