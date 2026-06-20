@@ -273,6 +273,13 @@ interface AgentsResponse {
 	};
 }
 
+const DEFAULT_LOADING_MESSAGES = [
+	__( 'Thinking…', 'frontend-agent-chat' ),
+	__( 'Checking context…', 'frontend-agent-chat' ),
+	__( 'Putting it together…', 'frontend-agent-chat' ),
+	__( 'Working through the next step…', 'frontend-agent-chat' ),
+];
+
 const DEFAULT_EXPAND_ICON_PATH = 'M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5';
 const DEFAULT_COLLAPSE_ICON_PATH = 'M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5';
 
@@ -1280,13 +1287,24 @@ export default function AgentChat( {
 		if ( loadingMessages === false ) {
 			return [];
 		}
-		if (
-			typeof loadingMessages === 'object' &&
-			loadingMessages.messages?.length
-		) {
-			return loadingMessages.messages;
+		if ( loadingMessages === true ) {
+			return DEFAULT_LOADING_MESSAGES;
 		}
-		return [ __( 'Working…', 'frontend-agent-chat' ) ];
+		if ( typeof loadingMessages === 'object' ) {
+			const configuredMessages = loadingMessages.messages ?? [];
+			if ( loadingMessages.mode === 'override' ) {
+				return configuredMessages.length
+					? configuredMessages
+					: DEFAULT_LOADING_MESSAGES;
+			}
+			if ( loadingMessages.mode === 'extend' ) {
+				return [ ...DEFAULT_LOADING_MESSAGES, ...configuredMessages ];
+			}
+			return configuredMessages.length
+				? configuredMessages
+				: DEFAULT_LOADING_MESSAGES;
+		}
+		return DEFAULT_LOADING_MESSAGES;
 	}, [ loadingMessages ] );
 	const thinkingMessage = loadingMessageOptions.length
 		? loadingMessageOptions[
