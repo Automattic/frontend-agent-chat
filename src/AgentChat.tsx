@@ -170,8 +170,23 @@ function getToolPayload( group: AgentsApiToolGroup ): Record< string, unknown > 
 	if ( result && typeof result === 'object' ) {
 		return result as Record< string, unknown >;
 	}
+	const args = group.call?.args;
+	if ( args && typeof args === 'object' ) {
+		return args as Record< string, unknown >;
+	}
 	const raw = group.result?.message?.raw ?? group.call?.message?.raw ?? {};
 	return raw && typeof raw === 'object' ? raw : {};
+}
+
+function hasToolResult( group: AgentsApiToolGroup ): boolean {
+	return !! group.result;
+}
+
+function isToolCallReplacedByResult(
+	group: AgentsApiToolGroup,
+	resultIds: Set< string >
+): boolean {
+	return !! group.call && resultIds.has( group.id );
 }
 
 function parseArtifactStatusPayload(
@@ -1442,9 +1457,22 @@ export default function AgentChat( {
 		};
 	}, [ chat.isProcessing, chat.sendMessage ] );
 	const displayMessages = useMemo(
-		() =>
-			chat.messages.map( ( message ) => {
-				const toolGroups = groupToolMessages( [ message ] );
+		() => {
+			const toolResultIds = new Set(
+				chat.messages
+					.flatMap( ( message ) => groupToolMessages( [ message ] ) )
+					.filter( hasToolResult )
+					.map( ( group ) => group.id )
+			);
+
+			return chat.messages.map( ( message ) => {
+				const toolGroups = groupToolMessages( [ message ] ).filter(
+					( group ) =>
+						! isToolCallReplacedByResult(
+							group,
+							toolResultIds
+						)
+				);
 				if ( toolGroups.length === 0 ) {
 					return message;
 				}
@@ -1459,18 +1487,27 @@ export default function AgentChat( {
 				}
 
 				const ToolComponent = () =>
-					createElement( 'div', null, ...renderedTools );
+					createElement(
+						'div',
+						{ className: 'frontend-agent-chat__question-stack' },
+						...renderedTools
+					);
+				const textContent = message.content.filter(
+					( part ) => part.type === 'text' && part.text
+				);
 
 				return {
 					...message,
 					content: [
+						...textContent,
 						{
 							type: 'component' as const,
 							component: ToolComponent,
 						},
 					],
 				};
-			} ),
+			} );
+		},
 		[ chat.messages, toolRenderers ]
 	);
 	const submitMessage = useCallback(
