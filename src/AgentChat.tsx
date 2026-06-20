@@ -1492,14 +1492,9 @@ export default function AgentChat( {
 						{ className: 'frontend-agent-chat__question-stack' },
 						...renderedTools
 					);
-				const textContent = message.content.filter(
-					( part ) => part.type === 'text' && part.text
-				);
-
 				return {
 					...message,
 					content: [
-						...textContent,
 						{
 							type: 'component' as const,
 							component: ToolComponent,
