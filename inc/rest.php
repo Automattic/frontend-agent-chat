@@ -1,6 +1,6 @@
 <?php
 /**
- * REST adapter for @extrachill/chat.
+ * REST adapter for Agenttic chat clients.
  *
  * @package FrontendAgentChat
  */
@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Register REST routes expected by @extrachill/chat.
+ * Register REST routes expected by Agenttic chat clients.
  *
  * @return void
  */
@@ -160,6 +160,71 @@ function frontend_agent_chat_register_rest_routes(): void {
 	);
 }
 add_action( 'rest_api_init', 'frontend_agent_chat_register_rest_routes' );
+
+/**
+ * Sanitize client context forwarded by the browser widget.
+ *
+ * @param mixed $context Raw client context.
+ * @return array<string,mixed> Sanitized context.
+ */
+function frontend_agent_chat_rest_sanitize_client_context( $context ): array {
+	if ( ! is_array( $context ) ) {
+		return array();
+	}
+
+	$sanitized = array();
+	foreach ( $context as $key => $value ) {
+		$key = sanitize_key( (string) $key );
+		if ( '' === $key ) {
+			continue;
+		}
+
+		if ( is_bool( $value ) || is_int( $value ) || is_float( $value ) ) {
+			$sanitized[ $key ] = $value;
+			continue;
+		}
+
+		if ( is_string( $value ) ) {
+			$sanitized[ $key ] = sanitize_text_field( $value );
+			continue;
+		}
+
+		if ( is_array( $value ) ) {
+			$items = array();
+			foreach ( $value as $item ) {
+				if ( is_scalar( $item ) ) {
+					$items[] = sanitize_text_field( (string) $item );
+				}
+			}
+			if ( ! empty( $items ) ) {
+				$sanitized[ $key ] = $items;
+			}
+		}
+	}
+
+	return $sanitized;
+}
+
+/**
+ * Merge request client context into a canonical chat input.
+ *
+ * @param array           $input   Chat or queue input.
+ * @param WP_REST_Request $request REST request.
+ * @return array Updated input.
+ */
+function frontend_agent_chat_rest_add_request_client_context( array $input, WP_REST_Request $request ): array {
+	$request_context = frontend_agent_chat_rest_sanitize_client_context( $request->get_param( 'client_context' ) );
+	if ( empty( $request_context ) ) {
+		return $input;
+	}
+
+	$input['client_context'] = array_merge(
+		is_array( $input['client_context'] ?? null ) ? $input['client_context'] : array(),
+		$request_context
+	);
+
+	return $input;
+}
 
 /**
  * Bootstrap browser-scoped state before anonymous session APIs are used.
@@ -360,6 +425,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 		'attachments'    => is_array( $attachments ) ? $attachments : array(),
 		'client_context' => frontend_agent_chat_build_client_context( $request ),
 	);
+	$chat_input = frontend_agent_chat_rest_add_request_client_context( $chat_input, $request );
 
 	/**
 	 * Filter the canonical agents/chat input sent by the frontend chat widget.
@@ -550,6 +616,7 @@ function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
 		'attachments'    => is_array( $attachments ) ? $attachments : array(),
 		'client_context' => frontend_agent_chat_build_client_context( $request ),
 	);
+	$queue_input = frontend_agent_chat_rest_add_request_client_context( $queue_input, $request );
 
 	/**
 	 * Filter the canonical agents/queue-chat-message input sent by the frontend chat widget.
@@ -851,7 +918,7 @@ function frontend_agent_chat_extract_session_id( array $session ): string {
 }
 
 /**
- * Normalize canonical agents/chat result messages to @extrachill/chat messages.
+ * Normalize canonical agents/chat result messages to Agenttic chat messages.
  *
  * @param array  $result       Runtime result.
  * @param string $user_message Original user message.
@@ -882,7 +949,7 @@ function frontend_agent_chat_normalize_result_messages( array $result, string $u
  *
  * Normalizes both classic single-string content and multimodal content
  * (an array of text/image parts produced by user image uploads) into the
- * @extrachill/chat wire shape: `content` is always a plain string, and
+ * Agenttic chat wire shape: `content` is always a plain string, and
  * media is surfaced separately via `metadata.attachments` so the frontend
  * normalizer can render image previews on session reload.
  *
@@ -930,7 +997,7 @@ function frontend_agent_chat_session_messages( array $source ): array {
 }
 
 /**
- * Normalize citation-like metadata into the raw message contract used by @extrachill/chat.
+ * Normalize citation-like metadata into the raw message contract used by Agenttic chat.
  *
  * @param array $metadata Message or response metadata.
  * @return array

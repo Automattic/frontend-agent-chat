@@ -11,9 +11,10 @@
 /**
  * External dependencies
  */
-import '@extrachill/chat/css';
 import type { ReactElement } from 'react';
-import type { ChatMessageSuggestion } from '@extrachill/chat';
+import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
+import '@automattic/agenttic-ui/global.css';
+import '@automattic/agenttic-ui/embedded-agent-ui.css';
 
 /**
  * WordPress dependencies
@@ -56,6 +57,7 @@ declare global {
 			};
 			messageSuggestions?: ChatMessageSuggestion[];
 			chatContext?: Record< string, unknown >;
+			canUploadFiles?: boolean;
 			capabilities?: {
 				chat_run_status?: boolean;
 				chat_run_cancel?: boolean;
@@ -114,6 +116,7 @@ function init(): void {
 			persistenceCta: config.persistenceCta,
 			messageSuggestions: config.messageSuggestions,
 			chatContext: config.chatContext,
+			canUploadFiles: config.canUploadFiles ?? false,
 			capabilities: config.capabilities,
 			operatorDiagnosticsEnabled: config.operatorDiagnosticsEnabled,
 		} )
