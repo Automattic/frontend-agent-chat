@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.14.4] - 2026-06-22
+
+### Fixed
+- Fix inline chat agent header
+
 ## [0.14.3] - 2026-06-22
 
 ### Fixed
