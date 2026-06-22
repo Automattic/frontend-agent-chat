@@ -393,6 +393,63 @@
 	border-radius: 0;
 }
 
+.frontend-agent-chat__body .agenttic-embedded {
+	--color-background: var(--frontend-agent-chat-drawer-bg, #f8fafc);
+	--color-foreground: var(--frontend-agent-chat-text-primary, #1e293b);
+	--color-primary: var(--frontend-agent-chat-accent, #2563eb);
+	--color-primary-foreground: #fff;
+	--color-muted: var(--frontend-agent-chat-muted-bg, #e2e8f0);
+	--color-muted-foreground: var(--frontend-agent-chat-text-muted, #64748b);
+	--color-popover: var(--frontend-agent-chat-drawer-bg, #f8fafc);
+	--color-popover-muted: var(--frontend-agent-chat-bg-muted, #f8fafc);
+	--color-ring: var(--frontend-agent-chat-accent, #2563eb);
+	background: var(--color-background);
+	color: var(--color-foreground);
+	font-family: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+	height: 100%;
+	min-height: 0;
+}
+
+.frontend-agent-chat__body .agenttic-embedded__messages,
+.frontend-agent-chat__body .agenttic-embedded__footer {
+	background: var(--color-background);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__footer {
+	border-top-color: var(--frontend-agent-chat-border-color, #e2e8f0);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__message p {
+	background: var(--frontend-agent-chat-message-bg, #fff);
+	color: var(--color-foreground);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__message--user p {
+	background: var(--frontend-agent-chat-accent, #2563eb);
+	color: #fff;
+}
+
+.frontend-agent-chat__body .agenttic-embedded__thinking,
+.frontend-agent-chat__body .agenttic-embedded__error,
+.frontend-agent-chat__body .agenttic-embedded__empty,
+.frontend-agent-chat__body .agenttic-embedded__notice {
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__suggestions button,
+.frontend-agent-chat__body .agenttic-embedded__input button,
+.frontend-agent-chat__body .agenttic-embedded__input textarea {
+	border-color: var(--frontend-agent-chat-border-color, #e2e8f0);
+	background: var(--frontend-agent-chat-input-bg, #fff);
+	color: var(--color-foreground);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__input textarea:focus {
+	border-color: var(--frontend-agent-chat-accent, #2563eb);
+	outline: 2px solid var(--frontend-agent-chat-accent, #2563eb);
+	outline-offset: 2px;
+}
+
 .frontend-agent-chat__body .ec-chat-messages,
 .frontend-agent-chat__body .ec-chat-input-area,
 .frontend-agent-chat__body .ec-chat-session-switcher,
