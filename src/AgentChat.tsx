@@ -1617,10 +1617,11 @@ export default function AgentChat( {
 			chat.sendMessage( message, canUploadFiles ? files : undefined ),
 		[ canUploadFiles, chat ]
 	);
+	const newChatSession = chat.newSession;
 	useEffect( () => {
-		chat.newSession();
+		newChatSession();
 		setUnreadCount( 0 );
-	}, [ activeAgentSlug, chat ] );
+	}, [ activeAgentSlug, newChatSession ] );
 	const hasPersistenceCta = !! (
 		persistenceCta?.message ||
 		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
