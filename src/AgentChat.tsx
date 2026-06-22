@@ -1684,40 +1684,39 @@ export default function AgentChat( {
 			createElement(
 				'div',
 				{ className: 'frontend-agent-chat__header' },
-				! isInline &&
-					createElement(
-						'div',
-						{ className: 'frontend-agent-chat__agent' },
-						agents.length > 1
-							? createElement(
-									'select',
-									{
-										className:
-											'frontend-agent-chat__agent-select',
-										value: activeAgentSlug,
-										onChange: switchAgent,
-										'aria-label': __(
-											'Select chat agent',
-											'frontend-agent-chat'
-										),
-									},
-									agents.map( ( agent ) =>
-										createElement(
-											'option',
-											{
-												key: agent.slug,
-												value: agent.slug,
-											},
-											agent.name
-										)
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__agent' },
+					agents.length > 1
+						? createElement(
+								'select',
+								{
+									className:
+										'frontend-agent-chat__agent-select',
+									value: activeAgentSlug,
+									onChange: switchAgent,
+									'aria-label': __(
+										'Select chat agent',
+										'frontend-agent-chat'
+									),
+								},
+								agents.map( ( agent ) =>
+									createElement(
+										'option',
+										{
+											key: agent.slug,
+											value: agent.slug,
+										},
+										agent.name
 									)
-							  )
-							: createElement(
-									'span',
-									{ className: 'frontend-agent-chat__title' },
-									activeAgentName
-							  )
-					),
+								)
+						  )
+						: createElement(
+								'span',
+								{ className: 'frontend-agent-chat__title' },
+								activeAgentName
+						  )
+				),
 				createElement(
 					'div',
 					{ className: 'frontend-agent-chat__header-actions' },
