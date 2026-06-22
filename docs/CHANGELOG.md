@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.14.3] - 2026-06-22
+
+### Fixed
+- Fix chat session reset on message updates
+
 ## [0.14.2] - 2026-06-21
 
 ### Changed
