@@ -425,7 +425,7 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 		'attachments'    => is_array( $attachments ) ? $attachments : array(),
 		'client_context' => frontend_agent_chat_build_client_context( $request ),
 	);
-	$chat_input = frontend_agent_chat_rest_add_request_client_context( $chat_input, $request );
+	$chat_input  = frontend_agent_chat_rest_add_request_client_context( $chat_input, $request );
 
 	/**
 	 * Filter the canonical agents/chat input sent by the frontend chat widget.

@@ -10,8 +10,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@automattic/agenttic-client": "file:../agenttic@feature-question-card-primitive/packages/agenttic-client",
-		"@automattic/agenttic-ui": "file:../agenttic@feature-question-card-primitive/packages/agenttic-ui",
+		"@automattic/agenttic-client": "0.1.68",
+		"@automattic/agenttic-ui": "0.1.68",
 		"@wordpress/element": "^6.46.0",
 		"@wordpress/i18n": "^6.21.0"
 	},

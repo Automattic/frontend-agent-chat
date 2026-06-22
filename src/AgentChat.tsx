@@ -19,7 +19,6 @@
  */
 import {
 	createAgentsApiChatAdapter,
-	createPresentQuestionToolRenderers,
 	groupToolMessages,
 	renderToolGroups,
 	useAgentsApiChat,
@@ -39,7 +38,6 @@ import type {
 import {
 	AgentUI,
 	EmbeddedAgentUISuggestions,
-	QuestionCard,
 } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
@@ -165,7 +163,107 @@ interface ArtifactStatusPayload {
 	thumbnails: Array< { url: string; alt?: string } >;
 }
 
-function getToolPayload( group: AgentsApiToolGroup ): Record< string, unknown > {
+interface QuestionChoiceViewModel {
+	label: string;
+	value: string;
+}
+
+function normalizeQuestionChoice(
+	choice: unknown
+): QuestionChoiceViewModel | null {
+	if ( typeof choice === 'string' ) {
+		return { label: choice, value: choice };
+	}
+	if ( ! choice || typeof choice !== 'object' ) {
+		return null;
+	}
+	const record = choice as Record< string, unknown >;
+	const value = record.value ?? record.id ?? record.label ?? record.text;
+	const label = record.label ?? record.text ?? value;
+	if ( typeof value !== 'string' || typeof label !== 'string' ) {
+		return null;
+	}
+	return { label, value };
+}
+
+function createQuestionToolRenderers( options: {
+	disabled: () => boolean;
+	onAnswer: ( answer: string ) => void;
+} ): AgentsApiToolRenderers {
+	const renderQuestion = ( group: AgentsApiToolGroup ): ReactNode => {
+		const args = getToolPayload( group );
+		let question: string = __( 'Choose a response', 'frontend-agent-chat' );
+		if ( typeof args.question === 'string' ) {
+			question = args.question;
+		} else if ( typeof args.prompt === 'string' ) {
+			question = args.prompt;
+		} else if ( typeof args.message === 'string' ) {
+			question = args.message;
+		}
+		const choices = Array.isArray( args.choices )
+			? args.choices
+					.map( normalizeQuestionChoice )
+					.filter(
+						( choice ): choice is QuestionChoiceViewModel =>
+							!! choice
+					)
+			: [];
+		const choiceButtons =
+			choices.length > 0
+				? choices.map( ( choice ) =>
+						createElement(
+							'button',
+							{
+								key: choice.value,
+								type: 'button',
+								className:
+									'frontend-agent-chat__question-choice',
+								disabled: options.disabled(),
+								onClick: () => options.onAnswer( choice.value ),
+							},
+							choice.label
+						)
+				  )
+				: [
+						createElement(
+							'button',
+							{
+								key: 'continue',
+								type: 'button',
+								className:
+									'frontend-agent-chat__question-choice',
+								disabled: options.disabled(),
+								onClick: () => options.onAnswer( question ),
+							},
+							__( 'Continue', 'frontend-agent-chat' )
+						),
+				  ];
+
+		return createElement(
+			'div',
+			{ className: 'frontend-agent-chat__question-card' },
+			createElement(
+				'p',
+				{ className: 'frontend-agent-chat__question-text' },
+				question
+			),
+			createElement(
+				'div',
+				{ className: 'frontend-agent-chat__question-actions' },
+				...choiceButtons
+			)
+		);
+	};
+
+	return {
+		present_question: renderQuestion,
+		ask_question: renderQuestion,
+	};
+}
+
+function getToolPayload(
+	group: AgentsApiToolGroup
+): Record< string, unknown > {
 	const result = group.result?.result;
 	if ( result && typeof result === 'object' ) {
 		return result as Record< string, unknown >;
@@ -214,10 +312,30 @@ function parseArtifactStatusPayload(
 				.map( ( thumbnail ) => ( {
 					url: String( thumbnail.url ?? '' ),
 					alt:
-						typeof thumbnail.alt === 'string' ? thumbnail.alt : undefined,
+						typeof thumbnail.alt === 'string'
+							? thumbnail.alt
+							: undefined,
 				} ) )
 				.filter( ( thumbnail ) => thumbnail.url )
 		: [];
+	let previewUrl: string | undefined;
+	if ( typeof payload.preview_url === 'string' ) {
+		previewUrl = payload.preview_url;
+	} else if ( typeof payload.previewUrl === 'string' ) {
+		previewUrl = payload.previewUrl;
+	}
+	let resultUrl: string | undefined;
+	if ( typeof payload.result_url === 'string' ) {
+		resultUrl = payload.result_url;
+	} else if ( typeof payload.resultUrl === 'string' ) {
+		resultUrl = payload.resultUrl;
+	}
+	let diagnosticsCount: number | undefined;
+	if ( typeof payload.diagnostics_count === 'number' ) {
+		diagnosticsCount = payload.diagnostics_count;
+	} else if ( typeof payload.diagnosticsCount === 'number' ) {
+		diagnosticsCount = payload.diagnosticsCount;
+	}
 
 	return {
 		title: String( payload.title ?? group.name ),
@@ -227,24 +345,9 @@ function parseArtifactStatusPayload(
 			typeof payload.description === 'string'
 				? payload.description
 				: undefined,
-		previewUrl:
-			typeof payload.preview_url === 'string'
-				? payload.preview_url
-				: typeof payload.previewUrl === 'string'
-				? payload.previewUrl
-				: undefined,
-		resultUrl:
-			typeof payload.result_url === 'string'
-				? payload.result_url
-				: typeof payload.resultUrl === 'string'
-				? payload.resultUrl
-				: undefined,
-		diagnosticsCount:
-			typeof payload.diagnostics_count === 'number'
-				? payload.diagnostics_count
-				: typeof payload.diagnosticsCount === 'number'
-				? payload.diagnosticsCount
-				: undefined,
+		previewUrl,
+		resultUrl,
+		diagnosticsCount,
 		error: typeof payload.error === 'string' ? payload.error : undefined,
 		thumbnails,
 	};
@@ -496,11 +599,14 @@ function createAgentFetch(
 								...( data.client_context &&
 								typeof data.client_context === 'object' &&
 								! Array.isArray( data.client_context )
-									? ( data.client_context as Record< string, unknown > )
+									? ( data.client_context as Record<
+											string,
+											unknown
+									  > )
 									: {} ),
 								...( chatContext ?? {} ),
 							},
-						}
+					  }
 					: options.data,
 			headers: options.headers,
 		} );
@@ -579,21 +685,20 @@ function createFrontendRunAdapter(
 			} );
 		},
 		async queue( input ) {
-			const attachments = input.attachments?.length
-				? input.attachments
-				: input.files?.length
-				? await Promise.all(
-						input.files.map( async ( file ) => {
-							const uploaded = await uploadFn( file );
-							return {
-								filename: file.name,
-								mime_type: file.type,
-								url: uploaded.url,
-								media_id: uploaded.media_id,
-							};
-						} )
-				  )
-				: [];
+			let attachments = input.attachments ?? [];
+			if ( attachments.length === 0 && input.files?.length ) {
+				attachments = await Promise.all(
+					input.files.map( async ( file ) => {
+						const uploaded = await uploadFn( file );
+						return {
+							filename: file.name,
+							mime_type: file.type,
+							url: uploaded.url,
+							media_id: uploaded.media_id,
+						};
+					} )
+				);
+			}
 
 			const response = ( await fetchFn( {
 				path: `${ basePath }/queue`,
@@ -1398,7 +1503,10 @@ export default function AgentChat( {
 		const diffRenderer = ( group: AgentsApiToolGroup ) => {
 			const payload = getToolPayload( group );
 			const actionId = String(
-				payload.action_id ?? payload.actionId ?? payload.pending_action_id ?? ''
+				payload.action_id ??
+					payload.actionId ??
+					payload.pending_action_id ??
+					''
 			);
 			return createElement(
 				'div',
@@ -1422,7 +1530,10 @@ export default function AgentChat( {
 							{
 								type: 'button',
 								onClick: () =>
-									resolvePendingAction( actionId, 'accepted' ),
+									resolvePendingAction(
+										actionId,
+										'accepted'
+									),
 							},
 							__( 'Accept', 'frontend-agent-chat' )
 						),
@@ -1431,15 +1542,17 @@ export default function AgentChat( {
 							{
 								type: 'button',
 								onClick: () =>
-									resolvePendingAction( actionId, 'rejected' ),
+									resolvePendingAction(
+										actionId,
+										'rejected'
+									),
 							},
 							__( 'Reject', 'frontend-agent-chat' )
 						)
 					)
 			);
 		};
-		const questionRenderers = createPresentQuestionToolRenderers( {
-			QuestionCard,
+		const questionRenderers = createQuestionToolRenderers( {
 			disabled: () => chat.isProcessing,
 			onAnswer: ( answer ) => chat.sendMessage( answer ),
 		} );
@@ -1455,65 +1568,59 @@ export default function AgentChat( {
 			insert_content: diffRenderer,
 			...questionRenderers,
 		};
-	}, [ chat.isProcessing, chat.sendMessage ] );
-	const displayMessages = useMemo(
-		() => {
-			const toolResultIds = new Set(
-				chat.messages
-					.flatMap( ( message ) => groupToolMessages( [ message ] ) )
-					.filter( hasToolResult )
-					.map( ( group ) => group.id )
+	}, [ chat ] );
+	const displayMessages = useMemo( () => {
+		const toolResultIds = new Set(
+			chat.messages
+				.flatMap( ( message ) => groupToolMessages( [ message ] ) )
+				.filter( hasToolResult )
+				.map( ( group ) => group.id )
+		);
+
+		return chat.messages.map( ( message ) => {
+			const toolGroups = groupToolMessages( [ message ] ).filter(
+				( group ) =>
+					! isToolCallReplacedByResult( group, toolResultIds )
 			);
+			if ( toolGroups.length === 0 ) {
+				return message;
+			}
 
-			return chat.messages.map( ( message ) => {
-				const toolGroups = groupToolMessages( [ message ] ).filter(
-					( group ) =>
-						! isToolCallReplacedByResult(
-							group,
-							toolResultIds
-						)
+			const renderedTools = renderToolGroups(
+				toolGroups,
+				toolRenderers
+			).filter( Boolean );
+
+			if ( renderedTools.length === 0 ) {
+				return message;
+			}
+
+			const ToolComponent = () =>
+				createElement(
+					'div',
+					{ className: 'frontend-agent-chat__question-stack' },
+					...renderedTools
 				);
-				if ( toolGroups.length === 0 ) {
-					return message;
-				}
-
-				const renderedTools = renderToolGroups(
-					toolGroups,
-					toolRenderers
-				).filter( Boolean );
-
-				if ( renderedTools.length === 0 ) {
-					return message;
-				}
-
-				const ToolComponent = () =>
-					createElement(
-						'div',
-						{ className: 'frontend-agent-chat__question-stack' },
-						...renderedTools
-					);
-				return {
-					...message,
-					content: [
-						{
-							type: 'component' as const,
-							component: ToolComponent,
-						},
-					],
-				};
-			} );
-		},
-		[ chat.messages, toolRenderers ]
-	);
+			return {
+				...message,
+				content: [
+					{
+						type: 'component' as const,
+						component: ToolComponent,
+					},
+				],
+			};
+		} );
+	}, [ chat.messages, toolRenderers ] );
 	const submitMessage = useCallback(
 		( message: string, files?: File[] ) =>
 			chat.sendMessage( message, canUploadFiles ? files : undefined ),
-		[ canUploadFiles, chat.sendMessage ]
+		[ canUploadFiles, chat ]
 	);
 	useEffect( () => {
 		chat.newSession();
 		setUnreadCount( 0 );
-	}, [ activeAgentSlug, chat.newSession ] );
+	}, [ activeAgentSlug, chat ] );
 	const hasPersistenceCta = !! (
 		persistenceCta?.message ||
 		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
@@ -1640,9 +1747,12 @@ export default function AgentChat( {
 										onChange: (
 											event: ChangeEvent< HTMLSelectElement >
 										) => {
-											const nextSessionId = event.target.value;
+											const nextSessionId =
+												event.target.value;
 											if ( nextSessionId ) {
-												chat.loadSession( nextSessionId );
+												chat.loadSession(
+													nextSessionId
+												);
 											} else {
 												chat.newSession();
 											}
@@ -1655,7 +1765,10 @@ export default function AgentChat( {
 									createElement(
 										'option',
 										{ value: '' },
-										__( 'Current chat', 'frontend-agent-chat' )
+										__(
+											'Current chat',
+											'frontend-agent-chat'
+										)
 									),
 									chat.sessions.map( ( session, index ) =>
 										createElement(
