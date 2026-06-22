@@ -410,9 +410,26 @@
 	min-height: 0;
 }
 
+.frontend-agent-chat__body .agenttic-embedded__conversation {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
 .frontend-agent-chat__body .agenttic-embedded__messages,
 .frontend-agent-chat__body .agenttic-embedded__footer {
 	background: var(--color-background);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__messages {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.frontend-agent-chat__body .agenttic-embedded__footer {
+	flex: 0 0 auto;
 }
 
 .frontend-agent-chat__body .agenttic-embedded__footer {
