@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.2] - 2026-06-21
+
+### Changed
+- Use published Agenttic chat packages
+- Suppress rendered tool message text
+- Render tool questions below chat messages
+- Restore Agenttic loading message rotation
+- Use Agenttic tool grouping for chat renderers
+- Move starter suggestions into empty chat state
+- Restore rotating loading messages
+- Wire Agenttic question cards
+- Import embedded Agenttic styles explicitly
+- Avoid duplicate agent query params
+- Tighten Agenttic chat integration
+- Remove stale chat metadata prop
+- Use Agenttic for frontend chat
+
 ## [0.14.1] - 2026-06-19
 
 ### Changed
