@@ -23,6 +23,12 @@ update_option( 'frontend_agent_chat_config', [
     'enabled'     => true,
     'fab_label'   => 'Agent Chat',
     'fab_icon'    => 'AI',
+    'header_controls' => [
+        'agent_selector'    => true,
+        'session_controls' => true,
+        'expand_button'    => true,
+        'close_button'     => true,
+    ],
 ] );
 ```
 
@@ -33,6 +39,10 @@ update_option( 'frontend_agent_chat_config', [
 | `enabled` | `bool` | Toggle the chat on/off for this site |
 | `fab_label` | `string` | Floating action button label |
 | `fab_icon` | `string` | Floating action button icon or short text |
+| `header_controls.agent_selector` | `bool` | Show the agent selector/title in the drawer header |
+| `header_controls.session_controls` | `bool` | Show new/session picker controls in the drawer header |
+| `header_controls.expand_button` | `bool` | Show the viewport expand/collapse button |
+| `header_controls.close_button` | `bool` | Show the drawer close button |
 
 The config can also be overridden via the `frontend_agent_chat_config` filter.
 

@@ -80,6 +80,12 @@ interface AgentChatProps {
 	collapseIconPath?: string;
 	expandIconViewBox?: string;
 	layout?: 'floating' | 'inline';
+	headerControls?: {
+		agentSelector?: boolean;
+		sessionControls?: boolean;
+		expandButton?: boolean;
+		closeButton?: boolean;
+	};
 	isLoggedIn?: boolean;
 	loadingMessages?:
 		| boolean
@@ -1138,6 +1144,7 @@ export default function AgentChat( {
 	collapseIconPath,
 	expandIconViewBox = '0 0 24 24',
 	layout = 'floating',
+	headerControls,
 	isLoggedIn = false,
 	loadingMessages = true,
 	persistenceCta,
@@ -1632,7 +1639,13 @@ export default function AgentChat( {
 				'frontend-agent-chat'
 		  )
 		: persistenceCta?.message;
-	const showSessionControls = chatStorageReady && activeAgentSlug;
+	const showAgentSelector = headerControls?.agentSelector !== false;
+	const showSessionControls =
+		headerControls?.sessionControls !== false &&
+		chatStorageReady &&
+		!! activeAgentSlug;
+	const showExpandButton = headerControls?.expandButton !== false;
+	const showCloseButton = headerControls?.closeButton !== false;
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
 		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
@@ -1685,6 +1698,7 @@ export default function AgentChat( {
 				'div',
 				{ className: 'frontend-agent-chat__header' },
 				! isInline &&
+					showAgentSelector &&
 					createElement(
 						'div',
 						{ className: 'frontend-agent-chat__agent' },
@@ -1783,30 +1797,32 @@ export default function AgentChat( {
 									)
 								)
 						),
-					createElement(
-						'button',
-						{
-							type: 'button',
-							className: 'frontend-agent-chat__expand',
-							onClick: toggleExpanded,
-							'aria-label': expandedButtonLabel,
-							'aria-pressed': isExpanded,
-						},
-						renderExpandIcon(
-							expandButtonIconPath,
-							expandIconViewBox
+					showExpandButton &&
+						createElement(
+							'button',
+							{
+								type: 'button',
+								className: 'frontend-agent-chat__expand',
+								onClick: toggleExpanded,
+								'aria-label': expandedButtonLabel,
+								'aria-pressed': isExpanded,
+							},
+							renderExpandIcon(
+								expandButtonIconPath,
+								expandIconViewBox
+							)
+						),
+					showCloseButton &&
+						createElement(
+							'button',
+							{
+								type: 'button',
+								className: 'frontend-agent-chat__close',
+								onClick: close,
+								'aria-label': __( 'Close', 'frontend-agent-chat' ),
+							},
+							'\u00D7'
 						)
-					),
-					createElement(
-						'button',
-						{
-							type: 'button',
-							className: 'frontend-agent-chat__close',
-							onClick: close,
-							'aria-label': __( 'Close', 'frontend-agent-chat' ),
-						},
-						'\u00D7'
-					)
 				)
 			),
 			createElement(

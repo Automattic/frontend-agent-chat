@@ -44,6 +44,12 @@ declare global {
 			collapseIconPath?: string;
 			expandIconViewBox?: string;
 			layout?: 'floating' | 'inline';
+			headerControls?: {
+				agentSelector?: boolean;
+				sessionControls?: boolean;
+				expandButton?: boolean;
+				closeButton?: boolean;
+			};
 			isLoggedIn?: boolean;
 			loadingMessages?: boolean | {
 				mode?: 'default' | 'extend' | 'override';
@@ -111,6 +117,7 @@ function init(): void {
 			collapseIconPath: config.collapseIconPath,
 			expandIconViewBox: config.expandIconViewBox,
 			layout: config.layout,
+			headerControls: config.headerControls,
 			isLoggedIn: config.isLoggedIn ?? false,
 			loadingMessages: config.loadingMessages ?? true,
 			persistenceCta: config.persistenceCta,
