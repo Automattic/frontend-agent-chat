@@ -135,6 +135,34 @@ function frontend_agent_chat_sanitize_chat_context( $context ): array {
 }
 
 /**
+ * Sanitize header control visibility configuration.
+ *
+ * @param mixed $controls Raw header controls configuration.
+ * @return array{agentSelector:bool,sessionControls:bool,expandButton:bool,closeButton:bool} Sanitized controls.
+ */
+function frontend_agent_chat_sanitize_header_controls( $controls ): array {
+	$defaults = array(
+		'agent_selector'    => true,
+		'session_controls' => true,
+		'expand_button'    => true,
+		'close_button'     => true,
+	);
+
+	if ( ! is_array( $controls ) ) {
+		$controls = array();
+	}
+
+	$controls = wp_parse_args( $controls, $defaults );
+
+	return array(
+		'agentSelector'    => (bool) $controls['agent_selector'],
+		'sessionControls' => (bool) $controls['session_controls'],
+		'expandButton'    => (bool) $controls['expand_button'],
+		'closeButton'     => (bool) $controls['close_button'],
+	);
+}
+
+/**
  * Enqueue the frontend chat script and styles.
  *
  * Fires on wp_enqueue_scripts so the assets load on every frontend page.
@@ -206,6 +234,7 @@ function frontend_agent_chat_enqueue() {
 		'collapseIconPath'           => frontend_agent_chat_sanitize_svg_path( $config['collapse_icon_path'] ?? '' ),
 		'expandIconViewBox'          => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),
 		'layout'                     => 'inline' === ( $config['layout'] ?? '' ) ? 'inline' : 'floating',
+		'headerControls'             => frontend_agent_chat_sanitize_header_controls( $config['header_controls'] ?? array() ),
 		'isLoggedIn'                 => is_user_logged_in(),
 		'canUploadFiles'             => is_user_logged_in() && current_user_can( 'upload_files' ),
 		'capabilities'               => $capabilities,

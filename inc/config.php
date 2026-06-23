@@ -30,6 +30,12 @@ function frontend_agent_chat_get_config(): array {
 		'message_suggestions'  => array(),
 		'chat_context'         => array(),
 		'operator_diagnostics' => false,
+		'header_controls'      => array(
+			'agent_selector'    => true,
+			'session_controls' => true,
+			'expand_button'    => true,
+			'close_button'     => true,
+		),
 		'layout'               => 'floating',
 	);
 
