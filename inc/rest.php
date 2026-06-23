@@ -144,6 +144,16 @@ function frontend_agent_chat_register_rest_routes(): void {
 
 	register_rest_route(
 		'frontend-agent-chat/v1',
+		'/chat/(?P<session_id>[^/]+)/title',
+		array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => 'frontend_agent_chat_rest_update_session_title',
+			'permission_callback' => 'frontend_agent_chat_rest_can_chat',
+		)
+	);
+
+	register_rest_route(
+		'frontend-agent-chat/v1',
 		'/chat/(?P<session_id>[^/]+)',
 		array(
 			array(
@@ -845,6 +855,53 @@ function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ):
 }
 
 /**
+ * Update a stored session title through Agents API.
+ *
+ * @param WP_REST_Request $request REST request.
+ * @return WP_REST_Response|WP_Error
+ */
+function frontend_agent_chat_rest_update_session_title( WP_REST_Request $request ) {
+	$config     = frontend_agent_chat_get_config();
+	$agent_slug = frontend_agent_chat_rest_get_agent_slug( $request, frontend_agent_chat_get_default_agent_slug( $config ) );
+	$session_id = sanitize_text_field( (string) $request['session_id'] );
+	$title      = trim( sanitize_text_field( (string) $request->get_param( 'title' ) ) );
+
+	if ( '' === $agent_slug || '' === $session_id ) {
+		return new WP_Error( 'frontend_agent_chat_invalid_session_title_request', __( 'agent and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	if ( '' === $title ) {
+		return new WP_Error( 'frontend_agent_chat_empty_session_title', __( 'Session title cannot be empty.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
+	}
+
+	$result = frontend_agent_chat_execute_ability(
+		'agents/update-conversation-session-title',
+		frontend_agent_chat_add_browser_principal_input(
+			array(
+				'agent'      => $agent_slug,
+				'session_id' => $session_id,
+				'title'      => $title,
+			)
+		)
+	);
+
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$session = is_array( $result['session'] ?? null ) ? $result['session'] : array();
+	return rest_ensure_response(
+		array(
+			'success' => true,
+			'data'    => array(
+				'session_id' => frontend_agent_chat_extract_session_id( $session ) ?: $session_id,
+				'title'      => (string) ( $session['title'] ?? $title ),
+			),
+		)
+	);
+}
+
+/**
  * Normalize canonical chat run-control ability output for REST clients.
  *
  * @param array  $result     Ability result.
@@ -1281,16 +1338,21 @@ function frontend_agent_chat_flatten_message_content( $content ): string {
  * @return array
  */
 function frontend_agent_chat_session_summary( array $session ): array {
-	$messages = frontend_agent_chat_session_messages( $session );
+	$messages      = frontend_agent_chat_session_messages( $session );
+	$stored_title  = trim( (string) ( $session['title'] ?? '' ) );
+	$metadata      = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+	$metadata['has_stored_title'] = '' !== $stored_title;
+	$metadata['stored_title']     = $stored_title;
 	return array(
 		'session_id'    => frontend_agent_chat_extract_session_id( $session ),
-		'title'         => (string) ( $session['title'] ?? frontend_agent_chat_title_from_messages( $messages ) ),
+		'title'         => '' !== $stored_title ? $stored_title : frontend_agent_chat_title_from_messages( $messages ),
 		'context'       => (string) ( $session['context'] ?? 'frontend-agent-chat' ),
 		'first_message' => frontend_agent_chat_first_user_message( $messages ),
 		'message_count' => count( $messages ),
 		'unread_count'  => (int) ( $session['unread_count'] ?? 0 ),
 		'created_at'    => (string) ( $session['created_at'] ?? '' ),
 		'updated_at'    => (string) ( $session['updated_at'] ?? '' ),
+		'metadata'      => $metadata,
 	);
 }
 
