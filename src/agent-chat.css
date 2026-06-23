@@ -436,14 +436,21 @@
 	border-top-color: var(--frontend-agent-chat-border-color, #e2e8f0);
 }
 
-.frontend-agent-chat__body .agenttic-embedded__message p {
+.frontend-agent-chat__body .agenttic-embedded__bubble {
 	background: var(--frontend-agent-chat-message-bg, #fff);
 	color: var(--color-foreground);
 }
 
-.frontend-agent-chat__body .agenttic-embedded__message--user p {
+.frontend-agent-chat__body .agenttic-embedded__message--user .agenttic-embedded__bubble {
 	background: var(--frontend-agent-chat-accent, #2563eb);
 	color: #fff;
+}
+
+.frontend-agent-chat__body .agenttic-embedded__bubble a,
+.frontend-agent-chat__body .agenttic-embedded__bubble strong,
+.frontend-agent-chat__body .agenttic-embedded__bubble code,
+.frontend-agent-chat__body .agenttic-embedded__bubble li::marker {
+	color: inherit;
 }
 
 .frontend-agent-chat__body .agenttic-embedded__thinking,
