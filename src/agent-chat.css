@@ -93,6 +93,26 @@
 	font-weight: 600;
 }
 
+.frontend-agent-chat__question-card.is-answered {
+	gap: 0.35rem;
+	padding: 0.75rem 0.9rem;
+	box-shadow: none;
+	background: #f8fafc;
+}
+
+.frontend-agent-chat__question-card.is-answered .frontend-agent-chat__question-text {
+	font-size: 0.85rem;
+	font-weight: 500;
+	color: #50575e;
+}
+
+.frontend-agent-chat__question-answer {
+	margin: 0;
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: #1e1e1e;
+}
+
 .frontend-agent-chat__question-actions {
 	display: flex;
 	flex-wrap: wrap;

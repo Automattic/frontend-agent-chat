@@ -196,10 +196,12 @@ function normalizeQuestionChoice(
 
 function createQuestionToolRenderers( options: {
 	disabled: () => boolean;
-	onAnswer: ( answer: string ) => void;
+	isAnswered: ( groupId: string ) => string | undefined;
+	onAnswer: ( groupId: string, answer: string ) => void;
 } ): AgentsApiToolRenderers {
 	const renderQuestion = ( group: AgentsApiToolGroup ): ReactNode => {
 		const args = getToolPayload( group );
+		const answered = options.isAnswered( group.id );
 		let question: string = __( 'Choose a response', 'frontend-agent-chat' );
 		if ( typeof args.question === 'string' ) {
 			question = args.question;
@@ -227,7 +229,7 @@ function createQuestionToolRenderers( options: {
 								className:
 									'frontend-agent-chat__question-choice',
 								disabled: options.disabled(),
-								onClick: () => options.onAnswer( choice.value ),
+								onClick: () => options.onAnswer( group.id, choice.value ),
 							},
 							choice.label
 						)
@@ -241,11 +243,31 @@ function createQuestionToolRenderers( options: {
 								className:
 									'frontend-agent-chat__question-choice',
 								disabled: options.disabled(),
-								onClick: () => options.onAnswer( question ),
+								onClick: () => options.onAnswer( group.id, question ),
 							},
 							__( 'Continue', 'frontend-agent-chat' )
 						),
 				  ];
+		if ( answered ) {
+			return createElement(
+				'div',
+				{ className: 'frontend-agent-chat__question-card is-answered' },
+				createElement(
+					'p',
+					{ className: 'frontend-agent-chat__question-text' },
+					question
+				),
+				createElement(
+					'p',
+					{ className: 'frontend-agent-chat__question-answer' },
+					sprintf(
+						/* translators: %s: selected answer. */
+						__( 'Answered: %s', 'frontend-agent-chat' ),
+						answered
+					)
+				)
+			);
+		}
 
 		return createElement(
 			'div',
@@ -1232,6 +1254,9 @@ export default function AgentChat( {
 		useState< Record< string, unknown > | null >( null );
 	const [ retrievalState, setRetrievalState ] =
 		useState< RetrievalState | null >( null );
+	const [ answeredQuestions, setAnsweredQuestions ] = useState<
+		Record< string, string >
+	>( {} );
 	const [ agents, setAgents ] = useState< AgentSummary[] >( () =>
 		agentSlug
 			? [
@@ -1544,6 +1569,16 @@ export default function AgentChat( {
 		onUnreadChange: setUnreadCount,
 		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
 	} );
+	const answerQuestion = useCallback(
+		( groupId: string, answer: string ) => {
+			setAnsweredQuestions( ( current ) => ( {
+				...current,
+				[ groupId ]: answer,
+			} ) );
+			chat.sendMessage( answer );
+		},
+		[ chat ]
+	);
 	const sessionBootstrapRef = useRef< {
 		agentSlug: string;
 		waitingForSessions: AgentsApiSession[] | null;
@@ -1559,6 +1594,9 @@ export default function AgentChat( {
 	useEffect( () => {
 		currentSessionsRef.current = chat.sessions;
 	}, [ chat.sessions ] );
+	useEffect( () => {
+		setAnsweredQuestions( {} );
+	}, [ chat.sessionId ] );
 	useEffect( () => {
 		if ( ! chat.isProcessing || loadingMessageOptions.length < 2 ) {
 			setLoadingMessageIndex( 0 );
@@ -1641,7 +1679,8 @@ export default function AgentChat( {
 		};
 		const questionRenderers = createQuestionToolRenderers( {
 			disabled: () => chat.isProcessing,
-			onAnswer: ( answer ) => chat.sendMessage( answer ),
+			isAnswered: ( groupId ) => answeredQuestions[ groupId ],
+			onAnswer: answerQuestion,
 		} );
 
 		return {
@@ -1655,7 +1694,7 @@ export default function AgentChat( {
 			insert_content: diffRenderer,
 			...questionRenderers,
 		};
-	}, [ chat ] );
+	}, [ answerQuestion, answeredQuestions, chat ] );
 	const displayMessages = useMemo( () => {
 		const toolResultIds = new Set(
 			chat.messages
