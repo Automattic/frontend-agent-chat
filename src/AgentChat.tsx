@@ -32,6 +32,7 @@ import type {
 	AgentsApiRunAdapter as ChatRunAdapter,
 	AgentsApiRunCapabilities as ChatRunCapabilities,
 	AgentsApiRunEvent as ChatRunEvent,
+	AgentsApiSession,
 	AgentsApiToolRenderers,
 	AgentsApiToolGroup,
 } from '@automattic/agenttic-client/agents-api';
@@ -51,6 +52,7 @@ import {
 	useCallback,
 	useMemo,
 	useEffect,
+	useRef,
 } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
@@ -669,6 +671,69 @@ function getSessionLabel(
 		/* translators: %d: chat session number. */
 		__( 'Chat %d', 'frontend-agent-chat' ),
 		index + 1
+	);
+}
+
+function getMostRecentSession(
+	sessions: AgentsApiSession[]
+): AgentsApiSession | undefined {
+	return sessions.reduce< AgentsApiSession | undefined >( ( latest, session ) => {
+		if ( ! latest ) {
+			return session;
+		}
+
+		const latestTime = Date.parse(
+			latest.updatedAt ||
+				latest.updated_at ||
+				latest.createdAt ||
+				latest.created_at ||
+				''
+		);
+		const sessionTime = Date.parse(
+			session.updatedAt ||
+				session.updated_at ||
+				session.createdAt ||
+				session.created_at ||
+				''
+		);
+		if ( Number.isNaN( sessionTime ) ) {
+			return latest;
+		}
+
+		return Number.isNaN( latestTime ) || sessionTime > latestTime
+			? session
+			: latest;
+	}, undefined );
+}
+
+function getMessageText( message: AgentsApiMessage ): string {
+	return message.content
+		.filter( ( part ) => part.type === 'text' && typeof part.text === 'string' )
+		.map( ( part ) => part.text )
+		.join( ' ' )
+		.replace( /\s+/g, ' ' )
+		.trim();
+}
+
+function getSessionTitleFromMessages( messages: AgentsApiMessage[] ): string {
+	const firstUserMessage = messages.find( ( message ) => message.role === 'user' );
+	if ( ! firstUserMessage ) {
+		return '';
+	}
+
+	const text = getMessageText( firstUserMessage );
+	return text.length > 60 ? `${ text.slice( 0, 57 ).trimEnd() }...` : text;
+}
+
+function sessionHasStoredTitle( session: AgentsApiSession ): boolean {
+	const metadata = session.metadata ?? {};
+	if ( metadata.has_stored_title === true ) {
+		return true;
+	}
+
+	return (
+		typeof metadata.stored_title === 'string' &&
+		metadata.stored_title.trim() !== ''
 	);
 }
 
@@ -1479,6 +1544,21 @@ export default function AgentChat( {
 		onUnreadChange: setUnreadCount,
 		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
 	} );
+	const sessionBootstrapRef = useRef< {
+		agentSlug: string;
+		waitingForSessions: AgentsApiSession[] | null;
+		bootstrapped: boolean;
+	} >( {
+		agentSlug: '',
+		waitingForSessions: null,
+		bootstrapped: false,
+	} );
+	const currentSessionsRef = useRef< AgentsApiSession[] >( chat.sessions );
+	const titleUpdateInFlightRef = useRef< Set< string > >( new Set() );
+	const titledSessionIdsRef = useRef< Set< string > >( new Set() );
+	useEffect( () => {
+		currentSessionsRef.current = chat.sessions;
+	}, [ chat.sessions ] );
 	useEffect( () => {
 		if ( ! chat.isProcessing || loadingMessageOptions.length < 2 ) {
 			setLoadingMessageIndex( 0 );
@@ -1626,9 +1706,112 @@ export default function AgentChat( {
 	);
 	const newChatSession = chat.newSession;
 	useEffect( () => {
+		sessionBootstrapRef.current = {
+			agentSlug: activeAgentSlug,
+			waitingForSessions: isLoggedIn ? currentSessionsRef.current : null,
+			bootstrapped: ! isLoggedIn,
+		};
 		newChatSession();
 		setUnreadCount( 0 );
-	}, [ activeAgentSlug, newChatSession ] );
+	}, [ activeAgentSlug, isLoggedIn, newChatSession ] );
+	useEffect( () => {
+		const bootstrap = sessionBootstrapRef.current;
+		if (
+			! isLoggedIn ||
+			! chatStorageReady ||
+			! activeAgentSlug ||
+			bootstrap.agentSlug !== activeAgentSlug ||
+			bootstrap.bootstrapped
+		) {
+			return;
+		}
+
+		if ( chat.sessionId ) {
+			bootstrap.bootstrapped = true;
+			return;
+		}
+
+		if ( bootstrap.waitingForSessions === chat.sessions ) {
+			return;
+		}
+
+		const latestSession = getMostRecentSession( chat.sessions );
+		bootstrap.bootstrapped = true;
+		if ( latestSession?.id ) {
+			chat.loadSession( latestSession.id );
+		}
+	}, [
+		activeAgentSlug,
+		chat.sessions,
+		chat.sessionId,
+		chat.loadSession,
+		chatStorageReady,
+		isLoggedIn,
+	] );
+	useEffect( () => {
+		if (
+			! activeAgentSlug ||
+			! chatStorageReady ||
+			chat.isProcessing ||
+			! chat.sessionId
+		) {
+			return;
+		}
+
+		const sessionId = chat.sessionId;
+		const session = chat.sessions.find( ( item ) => item.id === sessionId );
+		if ( ! session ) {
+			return;
+		}
+
+		if ( sessionHasStoredTitle( session ) ) {
+			titledSessionIdsRef.current.add( sessionId );
+			return;
+		}
+
+		if (
+			titledSessionIdsRef.current.has( sessionId ) ||
+			titleUpdateInFlightRef.current.has( sessionId )
+		) {
+			return;
+		}
+
+		const title = getSessionTitleFromMessages( chat.messages );
+		if ( ! title ) {
+			return;
+		}
+
+		titleUpdateInFlightRef.current.add( sessionId );
+		agentFetch( {
+			path: `${ basePath }/${ encodeURIComponent( sessionId ) }/title`,
+			method: 'POST',
+			data: { title },
+		} )
+			.then( () => {
+				titledSessionIdsRef.current.add( sessionId );
+				return chat.loadSession( sessionId );
+			} )
+			.catch( ( err: unknown ) => {
+				// eslint-disable-next-line no-console
+				console.error(
+					'AgentChat: failed to update session title',
+					err
+				);
+			} )
+			.finally( () => {
+				titleUpdateInFlightRef.current.delete( sessionId );
+			} );
+	}, [
+		activeAgentSlug,
+		agentFetch,
+		basePath,
+		chat.isProcessing,
+		chat.loadSession,
+		chat.messages,
+		chat.sessionId,
+		chat.sessions,
+		chatStorageReady,
+	] );
 	const hasPersistenceCta = !! (
 		persistenceCta?.message ||
 		( persistenceCta?.actionUrl && persistenceCta?.actionLabel )
