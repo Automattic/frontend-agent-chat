@@ -310,6 +310,56 @@ function hasToolResult( group: AgentsApiToolGroup ): boolean {
 	return !! group.result;
 }
 
+function messageText( message: AgentsApiMessage ): string {
+	for ( const part of message.content ) {
+		if ( part.type === 'text' && typeof part.text === 'string' ) {
+			const text = part.text.trim();
+			if ( text ) {
+				return text;
+			}
+		}
+	}
+
+	const raw = message.raw ?? {};
+	for ( const key of [ 'content', 'text', 'message' ] ) {
+		const value = raw[ key ];
+		if ( typeof value === 'string' && value.trim() ) {
+			return value.trim();
+		}
+	}
+
+	return '';
+}
+
+function deriveAnsweredQuestions(
+	messages: AgentsApiMessage[]
+): Record< string, string > {
+	const answered: Record< string, string > = {};
+	for ( let index = 0; index < messages.length; index++ ) {
+		const groups = groupToolMessages( [ messages[ index ] ] ).filter(
+			( group ) =>
+				group.name === 'present_question' || group.name === 'ask_question'
+		);
+		if ( groups.length === 0 ) {
+			continue;
+		}
+
+		const answer = messages
+			.slice( index + 1 )
+			.find( ( message ) => message.role === 'user' );
+		const answerText = answer ? messageText( answer ) : '';
+		if ( ! answerText ) {
+			continue;
+		}
+
+		groups.forEach( ( group ) => {
+			answered[ group.id ] = answerText;
+		} );
+	}
+
+	return answered;
+}
+
 function isToolCallReplacedByResult(
 	group: AgentsApiToolGroup,
 	resultIds: Set< string >
@@ -1579,6 +1629,10 @@ export default function AgentChat( {
 		},
 		[ chat ]
 	);
+	const transcriptAnsweredQuestions = useMemo(
+		() => deriveAnsweredQuestions( chat.messages ),
+		[ chat.messages ]
+	);
 	const sessionBootstrapRef = useRef< {
 		agentSlug: string;
 		waitingForSessions: AgentsApiSession[] | null;
@@ -1679,7 +1733,9 @@ export default function AgentChat( {
 		};
 		const questionRenderers = createQuestionToolRenderers( {
 			disabled: () => chat.isProcessing,
-			isAnswered: ( groupId ) => answeredQuestions[ groupId ],
+			isAnswered: ( groupId ) =>
+				answeredQuestions[ groupId ] ??
+				transcriptAnsweredQuestions[ groupId ],
 			onAnswer: answerQuestion,
 		} );
 
@@ -1694,7 +1750,7 @@ export default function AgentChat( {
 			insert_content: diffRenderer,
 			...questionRenderers,
 		};
-	}, [ answerQuestion, answeredQuestions, chat ] );
+	}, [ answerQuestion, answeredQuestions, chat, transcriptAnsweredQuestions ] );
 	const displayMessages = useMemo( () => {
 		const toolResultIds = new Set(
 			chat.messages
