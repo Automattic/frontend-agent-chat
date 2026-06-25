@@ -65,7 +65,14 @@ import {
 	shouldRenderOperatorDiagnostics,
 } from './operator-diagnostics';
 import { getRetrievalState } from './retrieval-state';
+import {
+	getRunArtifactSummaries,
+	getRunDiagnosticSummaries,
+	getRunEventState,
+	getRunProgressSummary,
+} from './run-event-state';
 import type { RetrievalState } from './retrieval-state';
+import type { RunEventState } from './run-event-state';
 
 interface AgentChatProps {
 	agentSlug?: string;
@@ -935,24 +942,52 @@ function dispatchRunEvent(
 	event: ChatRunEvent,
 	detail: Record< string, unknown > = {}
 ): void {
+	const progress = getRunProgressSummary( event );
+	const artifacts = getRunArtifactSummaries( event );
+	const diagnostics = getRunDiagnosticSummaries( event );
+	const eventDetail = {
+		run_id: event.run_id,
+		session_id: event.session_id,
+		status: event.status,
+		event,
+		...detail,
+	};
+
 	window.dispatchEvent(
 		new CustomEvent( 'frontend-agent-chat:run-event', {
-			detail: {
-				event,
-				...detail,
-			},
+			detail: eventDetail,
 		} )
 	);
+	if ( progress ) {
+		window.dispatchEvent(
+			new CustomEvent( 'frontend-agent-chat:progress', {
+				detail: { ...eventDetail, progress },
+			} )
+		);
+	}
+	for ( const artifact of artifacts ) {
+		window.dispatchEvent(
+			new CustomEvent( 'frontend-agent-chat:artifact', {
+				detail: { ...eventDetail, artifact },
+			} )
+		);
+	}
+	for ( const diagnostic of diagnostics ) {
+		window.dispatchEvent(
+			new CustomEvent( 'frontend-agent-chat:diagnostic', {
+				detail: { ...eventDetail, diagnostic },
+			} )
+		);
+	}
 	dispatchLifecycleEvent( `run:${ event.type }`, {
-		...detail,
-		event,
+		...eventDetail,
 	} );
 }
 
 async function dispatchRunEvents(
 	runAdapter: ChatRunAdapter,
 	metadata: Record< string, unknown >
-): Promise< void > {
+): Promise< ChatRunEvent[] > {
 	const runId = metadata.run_id ?? metadata.runId;
 	const sessionId = metadata.session_id ?? metadata.sessionId;
 	if (
@@ -962,7 +997,7 @@ async function dispatchRunEvents(
 		typeof sessionId !== 'string' ||
 		! sessionId
 	) {
-		return;
+		return [];
 	}
 
 	const events = await runAdapter.listEvents( { runId, sessionId } );
@@ -973,6 +1008,8 @@ async function dispatchRunEvents(
 			status: event.status,
 		} );
 	}
+
+	return events;
 }
 
 /**
@@ -1266,6 +1303,126 @@ function renderRetrievalState( state: RetrievalState | null ): ReactNode {
 	);
 }
 
+function renderRunEventState( state: RunEventState | null ): ReactNode {
+	if ( ! state ) {
+		return null;
+	}
+
+	const progressText = state.progress
+		? getRunProgressText( state.progress )
+		: null;
+	const statusText = state.status
+		? state.status.replace( /_/g, ' ' )
+		: __( 'Active', 'frontend-agent-chat' );
+
+	return createElement(
+		'div',
+		{
+			className: 'frontend-agent-chat__run-status',
+			role: 'status',
+		},
+		createElement(
+			'div',
+			{ className: 'frontend-agent-chat__run-status-header' },
+			createElement(
+				'span',
+				{ className: 'frontend-agent-chat__run-status-label' },
+				state.label || __( 'Run activity', 'frontend-agent-chat' )
+			),
+			createElement(
+				'span',
+				{ className: 'frontend-agent-chat__run-status-badge' },
+				statusText
+			)
+		),
+		progressText &&
+			createElement(
+				'div',
+				{ className: 'frontend-agent-chat__run-progress' },
+				state.progress?.total && state.progress.current !== undefined
+					? createElement(
+							'progress',
+							{
+								max: state.progress.total,
+								value: Math.min(
+									state.progress.current,
+									state.progress.total
+								),
+							}
+					  )
+					: null,
+				createElement( 'span', null, progressText )
+			),
+		state.artifacts.length > 0 &&
+			createElement(
+				'div',
+				{ className: 'frontend-agent-chat__run-artifacts' },
+				createElement(
+					'span',
+					{ className: 'frontend-agent-chat__run-meta-label' },
+					sprintf(
+						/* translators: %d: artifact count. */
+						__( '%d artifact(s)', 'frontend-agent-chat' ),
+						state.artifacts.length
+					)
+				),
+				...state.artifacts.slice( -2 ).map( ( artifact ) =>
+					artifact.url
+						? createElement(
+								'a',
+								{
+									key: artifact.id ?? artifact.url ?? artifact.label,
+									href: artifact.url,
+									target: '_blank',
+									rel: 'noreferrer',
+								},
+								artifact.label
+						  )
+						: createElement(
+								'span',
+								{ key: artifact.id ?? artifact.label },
+								artifact.label
+						  )
+				)
+			),
+		state.diagnostics.length > 0 &&
+			createElement(
+				'div',
+				{ className: 'frontend-agent-chat__run-diagnostics' },
+				createElement(
+					'span',
+					{ className: 'frontend-agent-chat__run-meta-label' },
+					sprintf(
+						/* translators: %d: diagnostic count. */
+						__( '%d diagnostic(s)', 'frontend-agent-chat' ),
+						state.diagnostics.length
+					)
+				),
+				createElement(
+					'span',
+					null,
+					state.diagnostics[ state.diagnostics.length - 1 ].message
+				)
+			)
+	);
+}
+
+function getRunProgressText(
+	progress: NonNullable< RunEventState[ 'progress' ] >
+): string | null {
+	if ( progress.current !== undefined && progress.total !== undefined ) {
+		const unit = progress.unit ? ` ${ progress.unit }` : '';
+		return `${ progress.current }/${ progress.total }${ unit }`;
+	}
+
+	if ( progress.current !== undefined ) {
+		const unit = progress.unit ? ` ${ progress.unit }` : '';
+		return `${ progress.current }${ unit }`;
+	}
+
+	return progress.label ?? null;
+}
+
 export default function AgentChat( {
 	agentSlug,
 	basePath,
@@ -1304,6 +1461,8 @@ export default function AgentChat( {
 		useState< Record< string, unknown > | null >( null );
 	const [ retrievalState, setRetrievalState ] =
 		useState< RetrievalState | null >( null );
+	const [ runEventState, setRunEventState ] =
+		useState< RunEventState | null >( null );
 	const [ answeredQuestions, setAnsweredQuestions ] = useState<
 		Record< string, string >
 	>( {} );
@@ -1374,6 +1533,7 @@ export default function AgentChat( {
 			}
 
 			setRetrievalState( null );
+			setRunEventState( null );
 
 			dispatchLifecycleEvent( 'message-submitted', {
 				agent: activeAgentSlug,
@@ -1409,15 +1569,17 @@ export default function AgentChat( {
 					: null
 			);
 			if ( capabilities?.chat_run_events ) {
-				dispatchRunEvents( runAdapter, responseMetadata ).catch(
-					( err: unknown ) => {
+				dispatchRunEvents( runAdapter, responseMetadata )
+					.then( ( events ) => {
+						setRunEventState( getRunEventState( events ) );
+					} )
+					.catch( ( err: unknown ) => {
 						// eslint-disable-next-line no-console
 						console.error(
 							'AgentChat: failed to fetch chat run events',
 							err
 						);
-					}
-				);
+					} );
 			}
 		},
 		[
@@ -1510,6 +1672,7 @@ export default function AgentChat( {
 	useEffect( () => {
 		setUnreadCount( 0 );
 		setRetrievalState( null );
+		setRunEventState( null );
 		setOperatorDiagnosticsMetadata( null );
 	}, [ activeAgentSlug ] );
 
@@ -1580,11 +1743,16 @@ export default function AgentChat( {
 		: undefined;
 	const renderChatHeader = useCallback( () => {
 		const retrievalStateNode = renderRetrievalState( retrievalState );
+		const runEventStateNode = renderRunEventState( runEventState );
 		const operatorDiagnosticsNode = canShowOperatorDiagnostics
 			? renderOperatorDiagnosticsPanel( operatorDiagnosticsMetadata )
 			: null;
 
-		if ( ! retrievalStateNode && ! operatorDiagnosticsNode ) {
+		if (
+			! retrievalStateNode &&
+			! runEventStateNode &&
+			! operatorDiagnosticsNode
+		) {
 			return null;
 		}
 
@@ -1592,12 +1760,14 @@ export default function AgentChat( {
 			'div',
 			{ className: 'frontend-agent-chat__chat-header' },
 			retrievalStateNode,
+			runEventStateNode,
 			operatorDiagnosticsNode
 		);
 	}, [
 		canShowOperatorDiagnostics,
 		operatorDiagnosticsMetadata,
 		retrievalState,
+		runEventState,
 	] );
 	const chatAdapter = useMemo(
 		() =>
