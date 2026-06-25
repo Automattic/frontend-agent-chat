@@ -52,9 +52,69 @@ describe( 'run event state', () => {
 		).toEqual( {
 			current: 3,
 			total: 5,
+			percent: undefined,
 			unit: 'steps',
 			label: undefined,
 		} );
+	} );
+
+	it( 'extracts generic progress envelopes', () => {
+		expect(
+			getRunProgressSummary(
+				runEvent( 'status', {
+					progress_envelope: {
+						value: 25,
+						max: 100,
+						percentage: 0.25,
+						phase: 'Rendering preview',
+					},
+				} )
+			)
+		).toEqual( {
+			current: 25,
+			total: 100,
+			percent: 25,
+			unit: undefined,
+			label: 'Rendering preview',
+		} );
+	} );
+
+	it( 'extracts Codebox normalized progress envelopes', () => {
+		const event = runEvent( 'worker.completed', {}, 'running' );
+		event.raw = {
+			type: 'worker.completed',
+			normalized_progress: {
+				schema: 'wp-codebox/live-progress-event/v1',
+				phase: 'worker.completed',
+				status: 'succeeded',
+				label: 'Worker completed',
+				progress: {
+					completed: 2,
+					total: 3,
+				},
+				artifacts: [ { id: 'artifact-1', label: 'Generated site' } ],
+				diagnostics: [ { level: 'info', message: 'Worker finished' } ],
+			},
+		};
+
+		expect( getRunProgressSummary( event ) ).toEqual( {
+			current: 2,
+			total: 3,
+			percent: undefined,
+			unit: undefined,
+			label: 'Worker completed',
+		} );
+		expect( getRunArtifactSummaries( event ) ).toEqual( [
+			{
+				id: 'artifact-1',
+				label: 'Generated site',
+				url: undefined,
+				type: undefined,
+			},
+		] );
+		expect( getRunDiagnosticSummaries( event ) ).toEqual( [
+			{ level: 'info', message: 'Worker finished' },
+		] );
 	} );
 
 	it( 'extracts artifact refs from generic event metadata', () => {
@@ -123,9 +183,18 @@ describe( 'run event state', () => {
 			progress: {
 				current: 1,
 				total: 2,
+				percent: undefined,
 				unit: undefined,
 				label: 'Generating preview',
 			},
+			timeline: [
+				{
+					id: 'run-1-progress',
+					type: 'progress',
+					label: 'Generating preview',
+					status: 'running',
+				},
+			],
 			artifacts: [
 				{
 					id: 'preview',

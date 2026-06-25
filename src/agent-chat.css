@@ -629,6 +629,36 @@
 	height: 6px;
 }
 
+.frontend-agent-chat__run-timeline {
+	display: grid;
+	gap: 4px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	color: var(--frontend-agent-chat-text-muted, #475569);
+	font-size: 12px;
+	line-height: 1.35;
+}
+
+.frontend-agent-chat__run-timeline li {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.frontend-agent-chat__run-timeline span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.frontend-agent-chat__run-timeline em {
+	flex: 0 0 auto;
+	font-style: normal;
+	text-transform: capitalize;
+	opacity: 0.8;
+}
+
 .frontend-agent-chat__run-artifacts,
 .frontend-agent-chat__run-diagnostics {
 	color: var(--frontend-agent-chat-text-muted, #475569);

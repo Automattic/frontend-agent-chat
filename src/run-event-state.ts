@@ -3,8 +3,16 @@ import type { AgentsApiRunEvent } from '@automattic/agenttic-client/agents-api';
 export interface RunProgressSummary {
 	current?: number;
 	total?: number;
+	percent?: number;
 	unit?: string;
 	label?: string;
+}
+
+export interface RunTimelineEntry {
+	id: string;
+	type: string;
+	label: string;
+	status?: string;
 }
 
 export interface RunArtifactSummary {
@@ -25,6 +33,7 @@ export interface RunEventState {
 	status?: string;
 	label: string;
 	progress?: RunProgressSummary;
+	timeline: RunTimelineEntry[];
 	artifacts: RunArtifactSummary[];
 	diagnostics: RunDiagnosticSummary[];
 }
@@ -37,6 +46,11 @@ export function getRunEventState(
 		const metadata = asRecord( event.metadata );
 		nextState.status = event.status ?? nextState.status;
 		nextState.label = getEventLabel( event, metadata ) ?? nextState.label;
+
+		const timelineEntry = getRunTimelineEntry( event, metadata );
+		if ( timelineEntry && ! hasTimelineEntry( nextState.timeline, timelineEntry ) ) {
+			nextState.timeline.push( timelineEntry );
+		}
 
 		const progress = getRunProgressSummary( event );
 		if ( progress ) {
@@ -58,11 +72,19 @@ export function getRunProgressSummary(
 	event: AgentsApiRunEvent
 ): RunProgressSummary | null {
 	const metadata = asRecord( event.metadata );
-	const progress = asRecord( metadata.progress );
+	const envelope = getProgressEnvelope( event, metadata );
+	const envelopeProgress = asRecord( envelope.progress );
 	const current = readNumber(
-		progress.current,
-		progress.completed,
-		progress.done,
+		envelopeProgress.current,
+		envelopeProgress.completed,
+		envelopeProgress.done,
+		envelopeProgress.value,
+		envelopeProgress.count,
+		envelope.current,
+		envelope.completed,
+		envelope.done,
+		envelope.value,
+		envelope.count,
 		metadata.progress_current,
 		metadata.progressCurrent,
 		metadata.completed,
@@ -70,36 +92,58 @@ export function getRunProgressSummary(
 		metadata.count
 	);
 	const total = readNumber(
-		progress.total,
+		envelopeProgress.total,
+		envelopeProgress.max,
+		envelope.total,
+		envelope.max,
 		metadata.progress_total,
 		metadata.progressTotal,
 		metadata.total
 	);
+	const percent = normalizePercent(
+		readNumber(
+			envelopeProgress.percent,
+			envelopeProgress.percentage,
+			envelopeProgress.pct,
+			envelope.percent,
+			envelope.percentage,
+			envelope.pct,
+			metadata.progress_percent,
+			metadata.progressPercent,
+			metadata.percent,
+			metadata.percentage
+		)
+	);
 	const label = readString(
-		progress.label,
+		envelope.label,
+		envelope.title,
+		envelope.message,
+		envelope.phase,
 		metadata.label,
 		metadata.message,
 		event.raw.message
 	);
-	const unit = readString( progress.unit, metadata.unit );
+	const unit = readString( envelope.unit, metadata.unit );
 	const hasProgressType = event.type.includes( 'progress' );
 
 	if (
 		current === undefined &&
 		total === undefined &&
+		percent === undefined &&
 		! label &&
 		! hasProgressType
 	) {
 		return null;
 	}
 
-	return { current, total, unit, label };
+	return { current, total, percent, unit, label };
 }
 
 export function getRunArtifactSummaries(
 	event: AgentsApiRunEvent
 ): RunArtifactSummary[] {
 	const metadata = asRecord( event.metadata );
+	const envelope = getProgressEnvelope( event, metadata );
 	const candidates = [
 		metadata.artifact,
 		metadata.artifact_ref,
@@ -107,6 +151,7 @@ export function getRunArtifactSummaries(
 		metadata.artifact_url,
 		metadata.artifactUrl,
 		...( Array.isArray( metadata.artifacts ) ? metadata.artifacts : [] ),
+		...( Array.isArray( envelope.artifacts ) ? envelope.artifacts : [] ),
 	];
 
 	return candidates
@@ -118,9 +163,12 @@ export function getRunDiagnosticSummaries(
 	event: AgentsApiRunEvent
 ): RunDiagnosticSummary[] {
 	const metadata = asRecord( event.metadata );
+	const envelope = getProgressEnvelope( event, metadata );
 	const diagnostics = [
 		metadata.diagnostic,
+		envelope.diagnostic,
 		...( Array.isArray( metadata.diagnostics ) ? metadata.diagnostics : [] ),
+		...( Array.isArray( envelope.diagnostics ) ? envelope.diagnostics : [] ),
 		...( Array.isArray( metadata.warnings )
 			? metadata.warnings.map( ( warning ) => ( {
 					level: 'warning',
@@ -152,6 +200,7 @@ function createRunEventState( event: AgentsApiRunEvent ): RunEventState {
 		sessionId: event.session_id,
 		status: event.status,
 		label: 'Run activity',
+		timeline: [],
 		artifacts: [],
 		diagnostics: [],
 	};
@@ -161,7 +210,56 @@ function getEventLabel(
 	event: AgentsApiRunEvent,
 	metadata: Record< string, unknown >
 ): string | undefined {
-	return readString( metadata.title, metadata.label, metadata.message, event.raw.message );
+	const envelope = getProgressEnvelope( event, metadata );
+	return readString(
+		envelope.title,
+		envelope.label,
+		envelope.message,
+		metadata.title,
+		metadata.label,
+		metadata.message,
+		event.raw.message
+	);
+}
+
+function getProgressEnvelope(
+	event: AgentsApiRunEvent,
+	metadata: Record< string, unknown >
+): Record< string, unknown > {
+	const raw = asRecord( event.raw );
+	const candidates = [
+		metadata.progress_envelope,
+		metadata.normalized_progress,
+		raw.normalized_progress,
+		metadata.progress,
+		raw.progress,
+	];
+
+	for ( const candidate of candidates ) {
+		const envelope = asRecord( candidate );
+		if ( Object.keys( envelope ).length ) {
+			return envelope;
+		}
+	}
+
+	return {};
+}
+
+function getRunTimelineEntry(
+	event: AgentsApiRunEvent,
+	metadata: Record< string, unknown >
+): RunTimelineEntry | null {
+	const label = getEventLabel( event, metadata );
+	if ( ! label ) {
+		return null;
+	}
+
+	return {
+		id: readString( event.id, metadata.id ) ?? `${ event.type }:${ label }`,
+		type: event.type,
+		label,
+		status: event.status,
+	};
 }
 
 function normalizeArtifact( value: unknown ): RunArtifactSummary | null {
@@ -226,6 +324,22 @@ function hasArtifact(
 			( candidate.url && artifact.url === candidate.url ) ||
 			artifact.label === candidate.label
 	);
+}
+
+function hasTimelineEntry(
+	timeline: RunTimelineEntry[],
+	candidate: RunTimelineEntry
+): boolean {
+	return timeline.some( ( entry ) => entry.id === candidate.id );
+}
+
+function normalizePercent( value: number | undefined ): number | undefined {
+	if ( value === undefined ) {
+		return undefined;
+	}
+
+	const percent = value > 0 && value <= 1 ? value * 100 : value;
+	return Math.max( 0, Math.min( 100, percent ) );
 }
 
 function readNumber( ...values: unknown[] ): number | undefined {
