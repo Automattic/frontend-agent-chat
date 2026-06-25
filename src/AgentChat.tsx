@@ -158,6 +158,11 @@ interface RunEventsResponse {
 	};
 }
 
+interface ActiveRunIdentity {
+	runId: string;
+	sessionId: string;
+}
+
 type ArtifactStatus =
 	| 'pending'
 	| 'running'
@@ -716,6 +721,23 @@ function getRunId( metadata: Record< string, unknown > ): string | null {
 	return typeof runId === 'string' && runId.trim() ? runId : null;
 }
 
+function getRunIdentity(
+	metadata: Record< string, unknown >
+): ActiveRunIdentity | null {
+	const runId = metadata.run_id ?? metadata.runId;
+	const sessionId = metadata.session_id ?? metadata.sessionId;
+	if (
+		typeof runId !== 'string' ||
+		! runId.trim() ||
+		typeof sessionId !== 'string' ||
+		! sessionId.trim()
+	) {
+		return null;
+	}
+
+	return { runId, sessionId };
+}
+
 function normalizeQueueResult(
 	response: RunControlResponse
 ): QueueMessageResult {
@@ -984,32 +1006,45 @@ function dispatchRunEvent(
 	} );
 }
 
-async function dispatchRunEvents(
+async function fetchRunEvents(
 	runAdapter: ChatRunAdapter,
 	metadata: Record< string, unknown >
 ): Promise< ChatRunEvent[] > {
-	const runId = metadata.run_id ?? metadata.runId;
-	const sessionId = metadata.session_id ?? metadata.sessionId;
+	const runIdentity = getRunIdentity( metadata );
 	if (
 		! runAdapter.listEvents ||
-		typeof runId !== 'string' ||
-		! runId ||
-		typeof sessionId !== 'string' ||
-		! sessionId
+		! runIdentity
 	) {
 		return [];
 	}
 
-	const events = await runAdapter.listEvents( { runId, sessionId } );
-	for ( const event of events ) {
-		dispatchRunEvent( event, {
-			run_id: runId,
-			session_id: sessionId,
-			status: event.status,
-		} );
+	return runAdapter.listEvents( runIdentity );
+}
+
+function createMetadataRunEvent(
+	metadata: Record< string, unknown >
+): ChatRunEvent | null {
+	const runIdentity = getRunIdentity( metadata );
+	if ( ! runIdentity ) {
+		return null;
 	}
 
-	return events;
+	const status = metadata.status;
+	return normalizeRunEvent(
+		{
+			id: `metadata:${ runIdentity.runId }`,
+			type: metadata.progress || metadata.progress_envelope ? 'progress' : 'metadata',
+			run_id: runIdentity.runId,
+			session_id: runIdentity.sessionId,
+			status: typeof status === 'string' ? status : undefined,
+			metadata,
+		},
+		runIdentity.runId
+	);
+}
+
+function getRunEventKey( event: ChatRunEvent ): string {
+	return event.id || `${ event.run_id }:${ event.type }:${ event.raw.message ?? '' }`;
 }
 
 /**
@@ -1314,6 +1349,7 @@ function renderRunEventState( state: RunEventState | null ): ReactNode {
 	const statusText = state.status
 		? state.status.replace( /_/g, ' ' )
 		: __( 'Active', 'frontend-agent-chat' );
+	const timeline = state.timeline.slice( -3 );
 
 	return createElement(
 		'div',
@@ -1350,8 +1386,31 @@ function renderRunEventState( state: RunEventState | null ): ReactNode {
 								),
 							}
 					  )
+					: state.progress?.percent !== undefined
+					? createElement( 'progress', {
+							max: 100,
+							value: state.progress.percent,
+					  } )
 					: null,
 				createElement( 'span', null, progressText )
+			),
+		timeline.length > 0 &&
+			createElement(
+				'ol',
+				{ className: 'frontend-agent-chat__run-timeline' },
+				...timeline.map( ( entry ) =>
+					createElement(
+						'li',
+						{ key: entry.id },
+						createElement( 'span', null, entry.label ),
+						entry.status &&
+							createElement(
+								'em',
+								null,
+								entry.status.replace( /_/g, ' ' )
+							)
+					)
+				)
 			),
 		state.artifacts.length > 0 &&
 			createElement(
@@ -1412,12 +1471,21 @@ function getRunProgressText(
 ): string | null {
 	if ( progress.current !== undefined && progress.total !== undefined ) {
 		const unit = progress.unit ? ` ${ progress.unit }` : '';
-		return `${ progress.current }/${ progress.total }${ unit }`;
+		return progress.label
+			? `${ progress.label } · ${ progress.current }/${ progress.total }${ unit }`
+			: `${ progress.current }/${ progress.total }${ unit }`;
 	}
 
 	if ( progress.current !== undefined ) {
 		const unit = progress.unit ? ` ${ progress.unit }` : '';
-		return `${ progress.current }${ unit }`;
+		return progress.label
+			? `${ progress.label } · ${ progress.current }${ unit }`
+			: `${ progress.current }${ unit }`;
+	}
+
+	if ( progress.percent !== undefined ) {
+		const percent = `${ Math.round( progress.percent ) }%`;
+		return progress.label ? `${ progress.label } · ${ percent }` : percent;
 	}
 
 	return progress.label ?? null;
@@ -1463,9 +1531,13 @@ export default function AgentChat( {
 		useState< RetrievalState | null >( null );
 	const [ runEventState, setRunEventState ] =
 		useState< RunEventState | null >( null );
+	const [ activeRunIdentity, setActiveRunIdentity ] =
+		useState< ActiveRunIdentity | null >( null );
 	const [ answeredQuestions, setAnsweredQuestions ] = useState<
 		Record< string, string >
 	>( {} );
+	const runEventsRef = useRef< ChatRunEvent[] >( [] );
+	const runEventKeysRef = useRef< Set< string > >( new Set() );
 	const [ agents, setAgents ] = useState< AgentSummary[] >( () =>
 		agentSlug
 			? [
@@ -1526,6 +1598,33 @@ export default function AgentChat( {
 		},
 		[]
 	);
+	const resetRunEvents = useCallback( () => {
+		runEventsRef.current = [];
+		runEventKeysRef.current = new Set();
+		setRunEventState( null );
+		setActiveRunIdentity( null );
+	}, [] );
+	const rememberRunEvents = useCallback( ( events: ChatRunEvent[] ) => {
+		const nextEvents: ChatRunEvent[] = [];
+		for ( const event of events ) {
+			const key = getRunEventKey( event );
+			if ( runEventKeysRef.current.has( key ) ) {
+				continue;
+			}
+			runEventKeysRef.current.add( key );
+			nextEvents.push( event );
+		}
+
+		if ( nextEvents.length === 0 ) {
+			return;
+		}
+
+		runEventsRef.current = [ ...runEventsRef.current, ...nextEvents ];
+		for ( const event of nextEvents ) {
+			dispatchRunEvent( event );
+		}
+		setRunEventState( getRunEventState( runEventsRef.current ) );
+	}, [] );
 	const handleMessage = useCallback(
 		( message: AgentsApiMessage ) => {
 			if ( message.role !== 'user' ) {
@@ -1533,7 +1632,7 @@ export default function AgentChat( {
 			}
 
 			setRetrievalState( null );
-			setRunEventState( null );
+			resetRunEvents();
 
 			dispatchLifecycleEvent( 'message-submitted', {
 				agent: activeAgentSlug,
@@ -1541,7 +1640,7 @@ export default function AgentChat( {
 				has_attachments: !! message.attachments?.length,
 			} );
 		},
-		[ activeAgentSlug ]
+		[ activeAgentSlug, resetRunEvents ]
 	);
 	const handleError = useCallback(
 		( error: Error ) => {
@@ -1555,6 +1654,14 @@ export default function AgentChat( {
 	const handleResponseMetadata = useCallback(
 		( responseMetadata: Record< string, unknown > ) => {
 			setRetrievalState( getRetrievalState( responseMetadata ) );
+			const runIdentity = getRunIdentity( responseMetadata );
+			if ( runIdentity ) {
+				setActiveRunIdentity( runIdentity );
+				const metadataEvent = createMetadataRunEvent( responseMetadata );
+				if ( metadataEvent ) {
+					rememberRunEvents( [ metadataEvent ] );
+				}
+			}
 			dispatchLifecycleEvent( 'response-metadata', {
 				agent: activeAgentSlug,
 				metadata: responseMetadata,
@@ -1569,9 +1676,9 @@ export default function AgentChat( {
 					: null
 			);
 			if ( capabilities?.chat_run_events ) {
-				dispatchRunEvents( runAdapter, responseMetadata )
+				fetchRunEvents( runAdapter, responseMetadata )
 					.then( ( events ) => {
-						setRunEventState( getRunEventState( events ) );
+						rememberRunEvents( events );
 					} )
 					.catch( ( err: unknown ) => {
 						// eslint-disable-next-line no-console
@@ -1586,6 +1693,7 @@ export default function AgentChat( {
 			activeAgentSlug,
 			canShowOperatorDiagnostics,
 			capabilities?.chat_run_events,
+			rememberRunEvents,
 			runAdapter,
 		]
 	);
@@ -1672,9 +1780,9 @@ export default function AgentChat( {
 	useEffect( () => {
 		setUnreadCount( 0 );
 		setRetrievalState( null );
-		setRunEventState( null );
+		resetRunEvents();
 		setOperatorDiagnosticsMetadata( null );
-	}, [ activeAgentSlug ] );
+	}, [ activeAgentSlug, resetRunEvents ] );
 
 	// Escape exits expanded mode first, then closes the drawer.
 	useEffect( () => {
@@ -1789,6 +1897,55 @@ export default function AgentChat( {
 		onUnreadChange: setUnreadCount,
 		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
 	} );
+	useEffect( () => {
+		if (
+			! capabilities?.chat_run_events ||
+			! chat.isProcessing ||
+			! activeRunIdentity ||
+			! runAdapter.listEvents
+		) {
+			return;
+		}
+
+		let cancelled = false;
+		let timer: number | undefined;
+		const poll = () => {
+			runAdapter
+				.listEvents?.( activeRunIdentity )
+				.then( ( events ) => {
+					if ( ! cancelled ) {
+						rememberRunEvents( events );
+					}
+				} )
+				.catch( ( err: unknown ) => {
+					// eslint-disable-next-line no-console
+					console.error(
+						'AgentChat: failed to poll chat run events',
+						err
+					);
+				} )
+				.finally( () => {
+					if ( ! cancelled ) {
+						timer = window.setTimeout( poll, 1500 );
+					}
+				} );
+		};
+
+		poll();
+
+		return () => {
+			cancelled = true;
+			if ( timer !== undefined ) {
+				window.clearTimeout( timer );
+			}
+		};
+	}, [
+		activeRunIdentity,
+		capabilities?.chat_run_events,
+		chat.isProcessing,
+		rememberRunEvents,
+		runAdapter,
+	] );
 	const answerQuestion = useCallback(
 		( groupId: string, answer: string ) => {
 			setAnsweredQuestions( ( current ) => ( {
