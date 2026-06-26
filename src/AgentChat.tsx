@@ -1394,6 +1394,12 @@ function renderRunEventState( state: RunEventState | null ): ReactNode {
 					: null,
 				createElement( 'span', null, progressText )
 			),
+		state.latestPhase &&
+			createElement(
+				'span',
+				{ className: 'frontend-agent-chat__run-phase' },
+				state.latestPhase.replace( /[._-]/g, ' ' )
+			),
 		timeline.length > 0 &&
 			createElement(
 				'ol',

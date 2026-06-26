@@ -6,6 +6,7 @@ export interface RunProgressSummary {
 	percent?: number;
 	unit?: string;
 	label?: string;
+	phase?: string;
 }
 
 export interface RunTimelineEntry {
@@ -13,6 +14,7 @@ export interface RunTimelineEntry {
 	type: string;
 	label: string;
 	status?: string;
+	phase?: string;
 }
 
 export interface RunArtifactSummary {
@@ -32,6 +34,7 @@ export interface RunEventState {
 	sessionId?: string;
 	status?: string;
 	label: string;
+	latestPhase?: string;
 	progress?: RunProgressSummary;
 	timeline: RunTimelineEntry[];
 	artifacts: RunArtifactSummary[];
@@ -55,6 +58,7 @@ export function getRunEventState(
 		const progress = getRunProgressSummary( event );
 		if ( progress ) {
 			nextState.progress = progress;
+			nextState.latestPhase = progress.phase ?? nextState.latestPhase;
 		}
 
 		for ( const artifact of getRunArtifactSummaries( event ) ) {
@@ -123,7 +127,8 @@ export function getRunProgressSummary(
 		metadata.message,
 		event.raw.message
 	);
-	const unit = readString( envelope.unit, metadata.unit );
+	const phase = readString( envelope.phase, metadata.phase );
+	const unit = readString( envelopeProgress.unit, envelope.unit, metadata.unit );
 	const hasProgressType = event.type.includes( 'progress' );
 
 	if (
@@ -136,7 +141,7 @@ export function getRunProgressSummary(
 		return null;
 	}
 
-	return { current, total, percent, unit, label };
+	return { current, total, percent, unit, label, phase };
 }
 
 export function getRunArtifactSummaries(
@@ -152,6 +157,8 @@ export function getRunArtifactSummaries(
 		metadata.artifactUrl,
 		...( Array.isArray( metadata.artifacts ) ? metadata.artifacts : [] ),
 		...( Array.isArray( envelope.artifacts ) ? envelope.artifacts : [] ),
+		...objectMapValues( metadata.artifacts ),
+		...objectMapValues( envelope.artifacts ),
 	];
 
 	return candidates
@@ -169,6 +176,8 @@ export function getRunDiagnosticSummaries(
 		envelope.diagnostic,
 		...( Array.isArray( metadata.diagnostics ) ? metadata.diagnostics : [] ),
 		...( Array.isArray( envelope.diagnostics ) ? envelope.diagnostics : [] ),
+		...objectMapValues( metadata.diagnostics ),
+		...objectMapValues( envelope.diagnostics ),
 		...( Array.isArray( metadata.warnings )
 			? metadata.warnings.map( ( warning ) => ( {
 					level: 'warning',
@@ -200,6 +209,7 @@ function createRunEventState( event: AgentsApiRunEvent ): RunEventState {
 		sessionId: event.session_id,
 		status: event.status,
 		label: 'Run activity',
+		latestPhase: undefined,
 		timeline: [],
 		artifacts: [],
 		diagnostics: [],
@@ -249,16 +259,19 @@ function getRunTimelineEntry(
 	event: AgentsApiRunEvent,
 	metadata: Record< string, unknown >
 ): RunTimelineEntry | null {
+	const envelope = getProgressEnvelope( event, metadata );
 	const label = getEventLabel( event, metadata );
 	if ( ! label ) {
 		return null;
 	}
+	const phase = readString( envelope.phase, metadata.phase );
 
 	return {
-		id: readString( event.id, metadata.id ) ?? `${ event.type }:${ label }`,
+		id: readString( event.id, metadata.id ) ?? `${ event.type }:${ phase ?? label }`,
 		type: event.type,
 		label,
-		status: event.status,
+		status: readString( envelope.status, event.status ),
+		phase,
 	};
 }
 
@@ -271,8 +284,8 @@ function normalizeArtifact( value: unknown ): RunArtifactSummary | null {
 	}
 
 	const record = asRecord( value );
-	const url = readString( record.url, record.href, record.preview_url, record.previewUrl );
-	const id = readString( record.id, record.ref, record.artifact_id, record.artifactId );
+	const url = readString( record.url, record.href, record.preview_url, record.previewUrl, record.path );
+	const id = readString( record.id, record.ref, record.artifact_id, record.artifactId, record.path );
 	const label = readString( record.label, record.title, record.name, id, url );
 	if ( ! label ) {
 		return null;
@@ -302,6 +315,25 @@ function normalizeDiagnostic( value: unknown ): RunDiagnosticSummary | null {
 		level: normalizeDiagnosticLevel( level ),
 		message,
 	};
+}
+
+function objectMapValues( value: unknown ): unknown[] {
+	const record = asRecord( value );
+	if (
+		! Object.keys( record ).length ||
+		'label' in record ||
+		'message' in record ||
+		Array.isArray( value )
+	) {
+		return [];
+	}
+
+	return Object.entries( record ).map( ( [ key, entry ] ) => {
+		const entryRecord = asRecord( entry );
+		return Object.keys( entryRecord ).length
+			? { id: key, label: key, ...entryRecord }
+			: entry;
+	} );
 }
 
 function normalizeDiagnosticLevel(
