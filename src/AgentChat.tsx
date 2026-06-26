@@ -1895,7 +1895,7 @@ export default function AgentChat( {
 		onError: handleError,
 		onResponseMetadata: handleResponseMetadata,
 		onUnreadChange: setUnreadCount,
-		isVisible: isOpen && !! activeAgentSlug && chatStorageReady,
+		isVisible: isOpen && !! activeAgentSlug,
 	} );
 	useEffect( () => {
 		if (
@@ -2458,7 +2458,6 @@ export default function AgentChat( {
 					),
 				renderChatHeader(),
 				activeAgentSlug &&
-					chatStorageReady &&
 					createElement(
 						AgentUI.Container,
 						{
