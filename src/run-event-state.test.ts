@@ -55,6 +55,7 @@ describe( 'run event state', () => {
 			percent: undefined,
 			unit: 'steps',
 			label: undefined,
+			phase: undefined,
 		} );
 	} );
 
@@ -76,6 +77,7 @@ describe( 'run event state', () => {
 			percent: 25,
 			unit: undefined,
 			label: 'Rendering preview',
+			phase: 'Rendering preview',
 		} );
 	} );
 
@@ -89,27 +91,30 @@ describe( 'run event state', () => {
 				status: 'succeeded',
 				label: 'Worker completed',
 				progress: {
+					current: 2,
 					completed: 2,
 					total: 3,
+					percent: 67,
 				},
-				artifacts: [ { id: 'artifact-1', label: 'Generated site' } ],
-				diagnostics: [ { level: 'info', message: 'Worker finished' } ],
+				artifacts: { generated_site: { path: 'site.zip', kind: 'archive' } },
+				diagnostics: { worker: { level: 'info', message: 'Worker finished' } },
 			},
 		};
 
 		expect( getRunProgressSummary( event ) ).toEqual( {
 			current: 2,
 			total: 3,
-			percent: undefined,
+			percent: 67,
 			unit: undefined,
 			label: 'Worker completed',
+			phase: 'worker.completed',
 		} );
 		expect( getRunArtifactSummaries( event ) ).toEqual( [
 			{
-				id: 'artifact-1',
-				label: 'Generated site',
-				url: undefined,
-				type: undefined,
+				id: 'generated_site',
+				label: 'generated_site',
+				url: 'site.zip',
+				type: 'archive',
 			},
 		] );
 		expect( getRunDiagnosticSummaries( event ) ).toEqual( [
@@ -180,12 +185,14 @@ describe( 'run event state', () => {
 			sessionId: 'session-1',
 			status: 'completed',
 			label: 'Generating preview',
+			latestPhase: undefined,
 			progress: {
 				current: 1,
 				total: 2,
 				percent: undefined,
 				unit: undefined,
 				label: 'Generating preview',
+				phase: undefined,
 			},
 			timeline: [
 				{
@@ -193,6 +200,7 @@ describe( 'run event state', () => {
 					type: 'progress',
 					label: 'Generating preview',
 					status: 'running',
+					phase: undefined,
 				},
 			],
 			artifacts: [
