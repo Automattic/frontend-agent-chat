@@ -119,6 +119,7 @@ $GLOBALS['frontend_agent_chat_smoke_agents']  = array(
 $agents = frontend_agent_chat_list_accessible_agents();
 frontend_agent_chat_smoke_assert_equals( 'demo-agent', $agents[0]['agent_slug'] ?? '', 'accessible agents normalize from Agents API ability', $failures, $passes );
 frontend_agent_chat_smoke_assert_equals( true, frontend_agent_chat_user_can_see( $agents[0] ), 'visibility delegates to Agents API access without requiring a WP login', $failures, $passes );
+frontend_agent_chat_smoke_assert_equals( false, frontend_agent_chat_browser_cookie_secure_default(), 'browser principal cookie is not secure by default on non-SSL requests', $failures, $passes );
 
 $GLOBALS['frontend_agent_chat_smoke_allowed'] = false;
 frontend_agent_chat_smoke_assert_equals( false, frontend_agent_chat_user_can_see( $agents[0] ), 'visibility fails closed when Agents API denies the current principal', $failures, $passes );

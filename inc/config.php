@@ -278,7 +278,7 @@ function frontend_agent_chat_browser_principal_from_token( string $token ): arra
  * @return void
  */
 function frontend_agent_chat_set_browser_principal_cookie( string $token ): void {
-	$secure = (bool) apply_filters( 'frontend_agent_chat_browser_cookie_secure', true );
+	$secure = (bool) apply_filters( 'frontend_agent_chat_browser_cookie_secure', frontend_agent_chat_browser_cookie_secure_default() );
 	$path   = defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/';
 
 	setcookie(
@@ -295,6 +295,13 @@ function frontend_agent_chat_set_browser_principal_cookie( string $token ): void
 	);
 
 	$_COOKIE[ FRONTEND_AGENT_CHAT_BROWSER_COOKIE ] = $token;
+}
+
+/**
+ * Returns the default secure flag for the anonymous browser principal cookie.
+ */
+function frontend_agent_chat_browser_cookie_secure_default(): bool {
+	return function_exists( 'is_ssl' ) && is_ssl();
 }
 
 /**
