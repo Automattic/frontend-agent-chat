@@ -10,8 +10,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@automattic/agenttic-client": "file:../agenttic/packages/agenttic-client",
-		"@automattic/agenttic-ui": "file:../agenttic/packages/agenttic-ui",
+		"@automattic/agenttic-client": "0.1.72",
+		"@automattic/agenttic-ui": "0.1.72",
 		"@wordpress/element": "^6.46.0",
 		"@wordpress/i18n": "^6.21.0"
 	},
