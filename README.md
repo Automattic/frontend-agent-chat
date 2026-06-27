@@ -6,11 +6,11 @@ This plugin is the frontend companion for Agents API-powered WordPress agents. I
 
 ## How it works
 
-A small React app mounts a floating action button (FAB) in the bottom-right corner of every page. Click it and a slide-in drawer opens with a full chat interface powered by the [`@extrachill/chat`](https://www.npmjs.com/package/@extrachill/chat) package.
+A small React app mounts a floating action button (FAB) in the bottom-right corner of every page. Click it and a slide-in drawer opens with a full chat interface powered by the [`@automattic/agenttic-ui`](https://www.npmjs.com/package/@automattic/agenttic-ui) embedded agent UI, talking to Agents API through the [`@automattic/agenttic-client`](https://www.npmjs.com/package/@automattic/agenttic-client) package.
 
 The widget is a frontend shell. Agent runtime, tools, prompt policy, pending-action resolution, access control, and conversation sessions are provided by Agents API abilities and host-registered stores.
 
-`@extrachill/chat` remains the current React UI dependency because it speaks the REST contract used by this plugin's Agents API adapter. Other Automattic chat UI packages can converge here once they support the Agents API session, run-control, pending-action, and message contracts directly.
+`@automattic/agenttic-client` speaks the REST contract used by this plugin's Agents API adapter, and `@automattic/agenttic-ui` renders the chat UI on top of that client. Together they support the Agents API session, run-control, pending-action, and message contracts directly.
 
 ## Configuration
 
@@ -66,12 +66,12 @@ Browser                          Server
 -------                          ------
 FAB -> Drawer -> <Chat>    -->   /frontend-agent-chat/v1/chat
        (React)                   REST adapter
-       @extrachill/chat          -> agents/chat
-                                 -> agents/*conversation-session*
+       @automattic/agenttic-ui   -> agents/chat
+       @automattic/agenttic-client  -> agents/*conversation-session*
                                  -> agents/resolve-pending-action
 ```
 
-- **Frontend**: `@extrachill/chat` package, mounted via `wp_footer` hook
+- **Frontend**: `@automattic/agenttic-ui` + `@automattic/agenttic-client` packages, mounted via `wp_footer` hook
 - **Backend**: Local REST adapter that dispatches to canonical Agents API abilities
 - **Auth**: WordPress nonce authentication via `wp-api-fetch`
 - **Agent resolution**: `agents/list-accessible-agents`
