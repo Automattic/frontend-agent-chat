@@ -19,6 +19,7 @@
  */
 import {
 	createAgentsApiChatAdapter,
+	createPresentQuestionToolRenderers,
 	groupToolMessages,
 	renderToolGroups,
 	useAgentsApiChat,
@@ -39,6 +40,7 @@ import type {
 import {
 	AgentUI,
 	EmbeddedAgentUISuggestions,
+	QuestionCard,
 } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
@@ -181,126 +183,6 @@ interface ArtifactStatusPayload {
 	diagnosticsCount?: number;
 	error?: string;
 	thumbnails: Array< { url: string; alt?: string } >;
-}
-
-interface QuestionChoiceViewModel {
-	label: string;
-	value: string;
-}
-
-function normalizeQuestionChoice(
-	choice: unknown
-): QuestionChoiceViewModel | null {
-	if ( typeof choice === 'string' ) {
-		return { label: choice, value: choice };
-	}
-	if ( ! choice || typeof choice !== 'object' ) {
-		return null;
-	}
-	const record = choice as Record< string, unknown >;
-	const value = record.value ?? record.id ?? record.label ?? record.text;
-	const label = record.label ?? record.text ?? value;
-	if ( typeof value !== 'string' || typeof label !== 'string' ) {
-		return null;
-	}
-	return { label, value };
-}
-
-function createQuestionToolRenderers( options: {
-	disabled: () => boolean;
-	isAnswered: ( groupId: string ) => string | undefined;
-	onAnswer: ( groupId: string, answer: string ) => void;
-} ): AgentsApiToolRenderers {
-	const renderQuestion = ( group: AgentsApiToolGroup ): ReactNode => {
-		const args = getToolPayload( group );
-		const answered = options.isAnswered( group.id );
-		let question: string = __( 'Choose a response', 'frontend-agent-chat' );
-		if ( typeof args.question === 'string' ) {
-			question = args.question;
-		} else if ( typeof args.prompt === 'string' ) {
-			question = args.prompt;
-		} else if ( typeof args.message === 'string' ) {
-			question = args.message;
-		}
-		const choices = Array.isArray( args.choices )
-			? args.choices
-					.map( normalizeQuestionChoice )
-					.filter(
-						( choice ): choice is QuestionChoiceViewModel =>
-							!! choice
-					)
-			: [];
-		const choiceButtons =
-			choices.length > 0
-				? choices.map( ( choice ) =>
-						createElement(
-							'button',
-							{
-								key: choice.value,
-								type: 'button',
-								className:
-									'frontend-agent-chat__question-choice',
-								disabled: options.disabled(),
-								onClick: () => options.onAnswer( group.id, choice.value ),
-							},
-							choice.label
-						)
-				  )
-				: [
-						createElement(
-							'button',
-							{
-								key: 'continue',
-								type: 'button',
-								className:
-									'frontend-agent-chat__question-choice',
-								disabled: options.disabled(),
-								onClick: () => options.onAnswer( group.id, question ),
-							},
-							__( 'Continue', 'frontend-agent-chat' )
-						),
-				  ];
-		if ( answered ) {
-			return createElement(
-				'div',
-				{ className: 'frontend-agent-chat__question-card is-answered' },
-				createElement(
-					'p',
-					{ className: 'frontend-agent-chat__question-text' },
-					question
-				),
-				createElement(
-					'p',
-					{ className: 'frontend-agent-chat__question-answer' },
-					sprintf(
-						/* translators: %s: selected answer. */
-						__( 'Answered: %s', 'frontend-agent-chat' ),
-						answered
-					)
-				)
-			);
-		}
-
-		return createElement(
-			'div',
-			{ className: 'frontend-agent-chat__question-card' },
-			createElement(
-				'p',
-				{ className: 'frontend-agent-chat__question-text' },
-				question
-			),
-			createElement(
-				'div',
-				{ className: 'frontend-agent-chat__question-actions' },
-				...choiceButtons
-			)
-		);
-	};
-
-	return {
-		present_question: renderQuestion,
-		ask_question: renderQuestion,
-	};
 }
 
 function getToolPayload(
@@ -2064,12 +1946,19 @@ export default function AgentChat( {
 					)
 			);
 		};
-		const questionRenderers = createQuestionToolRenderers( {
+		const questionRenderers = createPresentQuestionToolRenderers( {
+			QuestionCard,
+			onAnswer: ( answer, _choice, group ) =>
+				answerQuestion( group.id, answer ),
 			disabled: () => chat.isProcessing,
-			isAnswered: ( groupId ) =>
-				answeredQuestions[ groupId ] ??
-				transcriptAnsweredQuestions[ groupId ],
-			onAnswer: answerQuestion,
+			answered: ( group ) =>
+				Boolean(
+					answeredQuestions[ group.id ] ??
+						transcriptAnsweredQuestions[ group.id ]
+				),
+			answeredChoice: ( group ) =>
+				answeredQuestions[ group.id ] ??
+				transcriptAnsweredQuestions[ group.id ],
 		} );
 
 		return {
