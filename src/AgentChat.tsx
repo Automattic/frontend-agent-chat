@@ -19,6 +19,7 @@
  */
 import {
 	createAgentsApiChatAdapter,
+	createPresentQuestionToolRenderers,
 	groupToolMessages,
 	renderToolGroups,
 	useAgentsApiChat,
@@ -39,6 +40,7 @@ import type {
 import {
 	AgentUI,
 	EmbeddedAgentUISuggestions,
+	QuestionCard,
 } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
@@ -68,11 +70,9 @@ import { getRetrievalState } from './retrieval-state';
 import {
 	getRunArtifactSummaries,
 	getRunDiagnosticSummaries,
-	getRunEventState,
 	getRunProgressSummary,
 } from './run-event-state';
 import type { RetrievalState } from './retrieval-state';
-import type { RunEventState } from './run-event-state';
 
 interface AgentChatProps {
 	agentSlug?: string;
@@ -181,126 +181,6 @@ interface ArtifactStatusPayload {
 	diagnosticsCount?: number;
 	error?: string;
 	thumbnails: Array< { url: string; alt?: string } >;
-}
-
-interface QuestionChoiceViewModel {
-	label: string;
-	value: string;
-}
-
-function normalizeQuestionChoice(
-	choice: unknown
-): QuestionChoiceViewModel | null {
-	if ( typeof choice === 'string' ) {
-		return { label: choice, value: choice };
-	}
-	if ( ! choice || typeof choice !== 'object' ) {
-		return null;
-	}
-	const record = choice as Record< string, unknown >;
-	const value = record.value ?? record.id ?? record.label ?? record.text;
-	const label = record.label ?? record.text ?? value;
-	if ( typeof value !== 'string' || typeof label !== 'string' ) {
-		return null;
-	}
-	return { label, value };
-}
-
-function createQuestionToolRenderers( options: {
-	disabled: () => boolean;
-	isAnswered: ( groupId: string ) => string | undefined;
-	onAnswer: ( groupId: string, answer: string ) => void;
-} ): AgentsApiToolRenderers {
-	const renderQuestion = ( group: AgentsApiToolGroup ): ReactNode => {
-		const args = getToolPayload( group );
-		const answered = options.isAnswered( group.id );
-		let question: string = __( 'Choose a response', 'frontend-agent-chat' );
-		if ( typeof args.question === 'string' ) {
-			question = args.question;
-		} else if ( typeof args.prompt === 'string' ) {
-			question = args.prompt;
-		} else if ( typeof args.message === 'string' ) {
-			question = args.message;
-		}
-		const choices = Array.isArray( args.choices )
-			? args.choices
-					.map( normalizeQuestionChoice )
-					.filter(
-						( choice ): choice is QuestionChoiceViewModel =>
-							!! choice
-					)
-			: [];
-		const choiceButtons =
-			choices.length > 0
-				? choices.map( ( choice ) =>
-						createElement(
-							'button',
-							{
-								key: choice.value,
-								type: 'button',
-								className:
-									'frontend-agent-chat__question-choice',
-								disabled: options.disabled(),
-								onClick: () => options.onAnswer( group.id, choice.value ),
-							},
-							choice.label
-						)
-				  )
-				: [
-						createElement(
-							'button',
-							{
-								key: 'continue',
-								type: 'button',
-								className:
-									'frontend-agent-chat__question-choice',
-								disabled: options.disabled(),
-								onClick: () => options.onAnswer( group.id, question ),
-							},
-							__( 'Continue', 'frontend-agent-chat' )
-						),
-				  ];
-		if ( answered ) {
-			return createElement(
-				'div',
-				{ className: 'frontend-agent-chat__question-card is-answered' },
-				createElement(
-					'p',
-					{ className: 'frontend-agent-chat__question-text' },
-					question
-				),
-				createElement(
-					'p',
-					{ className: 'frontend-agent-chat__question-answer' },
-					sprintf(
-						/* translators: %s: selected answer. */
-						__( 'Answered: %s', 'frontend-agent-chat' ),
-						answered
-					)
-				)
-			);
-		}
-
-		return createElement(
-			'div',
-			{ className: 'frontend-agent-chat__question-card' },
-			createElement(
-				'p',
-				{ className: 'frontend-agent-chat__question-text' },
-				question
-			),
-			createElement(
-				'div',
-				{ className: 'frontend-agent-chat__question-actions' },
-				...choiceButtons
-			)
-		);
-	};
-
-	return {
-		present_question: renderQuestion,
-		ask_question: renderQuestion,
-	};
 }
 
 function getToolPayload(
@@ -1338,165 +1218,6 @@ function renderRetrievalState( state: RetrievalState | null ): ReactNode {
 	);
 }
 
-function renderRunEventState( state: RunEventState | null ): ReactNode {
-	if ( ! state ) {
-		return null;
-	}
-
-	const progressText = state.progress
-		? getRunProgressText( state.progress )
-		: null;
-	const statusText = state.status
-		? state.status.replace( /_/g, ' ' )
-		: __( 'Active', 'frontend-agent-chat' );
-	const timeline = state.timeline.slice( -3 );
-
-	return createElement(
-		'div',
-		{
-			className: 'frontend-agent-chat__run-status',
-			role: 'status',
-		},
-		createElement(
-			'div',
-			{ className: 'frontend-agent-chat__run-status-header' },
-			createElement(
-				'span',
-				{ className: 'frontend-agent-chat__run-status-label' },
-				state.label || __( 'Run activity', 'frontend-agent-chat' )
-			),
-			createElement(
-				'span',
-				{ className: 'frontend-agent-chat__run-status-badge' },
-				statusText
-			)
-		),
-		progressText &&
-			createElement(
-				'div',
-				{ className: 'frontend-agent-chat__run-progress' },
-				state.progress?.total && state.progress.current !== undefined
-					? createElement(
-							'progress',
-							{
-								max: state.progress.total,
-								value: Math.min(
-									state.progress.current,
-									state.progress.total
-								),
-							}
-					  )
-					: state.progress?.percent !== undefined
-					? createElement( 'progress', {
-							max: 100,
-							value: state.progress.percent,
-					  } )
-					: null,
-				createElement( 'span', null, progressText )
-			),
-		state.latestPhase &&
-			createElement(
-				'span',
-				{ className: 'frontend-agent-chat__run-phase' },
-				state.latestPhase.replace( /[._-]/g, ' ' )
-			),
-		timeline.length > 0 &&
-			createElement(
-				'ol',
-				{ className: 'frontend-agent-chat__run-timeline' },
-				...timeline.map( ( entry ) =>
-					createElement(
-						'li',
-						{ key: entry.id },
-						createElement( 'span', null, entry.label ),
-						entry.status &&
-							createElement(
-								'em',
-								null,
-								entry.status.replace( /_/g, ' ' )
-							)
-					)
-				)
-			),
-		state.artifacts.length > 0 &&
-			createElement(
-				'div',
-				{ className: 'frontend-agent-chat__run-artifacts' },
-				createElement(
-					'span',
-					{ className: 'frontend-agent-chat__run-meta-label' },
-					sprintf(
-						/* translators: %d: artifact count. */
-						__( '%d artifact(s)', 'frontend-agent-chat' ),
-						state.artifacts.length
-					)
-				),
-				...state.artifacts.slice( -2 ).map( ( artifact ) =>
-					artifact.url
-						? createElement(
-								'a',
-								{
-									key: artifact.id ?? artifact.url ?? artifact.label,
-									href: artifact.url,
-									target: '_blank',
-									rel: 'noreferrer',
-								},
-								artifact.label
-						  )
-						: createElement(
-								'span',
-								{ key: artifact.id ?? artifact.label },
-								artifact.label
-						  )
-				)
-			),
-		state.diagnostics.length > 0 &&
-			createElement(
-				'div',
-				{ className: 'frontend-agent-chat__run-diagnostics' },
-				createElement(
-					'span',
-					{ className: 'frontend-agent-chat__run-meta-label' },
-					sprintf(
-						/* translators: %d: diagnostic count. */
-						__( '%d diagnostic(s)', 'frontend-agent-chat' ),
-						state.diagnostics.length
-					)
-				),
-				createElement(
-					'span',
-					null,
-					state.diagnostics[ state.diagnostics.length - 1 ].message
-				)
-			)
-	);
-}
-
-function getRunProgressText(
-	progress: NonNullable< RunEventState[ 'progress' ] >
-): string | null {
-	if ( progress.current !== undefined && progress.total !== undefined ) {
-		const unit = progress.unit ? ` ${ progress.unit }` : '';
-		return progress.label
-			? `${ progress.label } · ${ progress.current }/${ progress.total }${ unit }`
-			: `${ progress.current }/${ progress.total }${ unit }`;
-	}
-
-	if ( progress.current !== undefined ) {
-		const unit = progress.unit ? ` ${ progress.unit }` : '';
-		return progress.label
-			? `${ progress.label } · ${ progress.current }${ unit }`
-			: `${ progress.current }${ unit }`;
-	}
-
-	if ( progress.percent !== undefined ) {
-		const percent = `${ Math.round( progress.percent ) }%`;
-		return progress.label ? `${ progress.label } · ${ percent }` : percent;
-	}
-
-	return progress.label ?? null;
-}
-
 export default function AgentChat( {
 	agentSlug,
 	basePath,
@@ -1535,8 +1256,6 @@ export default function AgentChat( {
 		useState< Record< string, unknown > | null >( null );
 	const [ retrievalState, setRetrievalState ] =
 		useState< RetrievalState | null >( null );
-	const [ runEventState, setRunEventState ] =
-		useState< RunEventState | null >( null );
 	const [ activeRunIdentity, setActiveRunIdentity ] =
 		useState< ActiveRunIdentity | null >( null );
 	const [ answeredQuestions, setAnsweredQuestions ] = useState<
@@ -1607,7 +1326,6 @@ export default function AgentChat( {
 	const resetRunEvents = useCallback( () => {
 		runEventsRef.current = [];
 		runEventKeysRef.current = new Set();
-		setRunEventState( null );
 		setActiveRunIdentity( null );
 	}, [] );
 	const rememberRunEvents = useCallback( ( events: ChatRunEvent[] ) => {
@@ -1629,7 +1347,6 @@ export default function AgentChat( {
 		for ( const event of nextEvents ) {
 			dispatchRunEvent( event );
 		}
-		setRunEventState( getRunEventState( runEventsRef.current ) );
 	}, [] );
 	const handleMessage = useCallback(
 		( message: AgentsApiMessage ) => {
@@ -1857,16 +1574,11 @@ export default function AgentChat( {
 		: undefined;
 	const renderChatHeader = useCallback( () => {
 		const retrievalStateNode = renderRetrievalState( retrievalState );
-		const runEventStateNode = renderRunEventState( runEventState );
 		const operatorDiagnosticsNode = canShowOperatorDiagnostics
 			? renderOperatorDiagnosticsPanel( operatorDiagnosticsMetadata )
 			: null;
 
-		if (
-			! retrievalStateNode &&
-			! runEventStateNode &&
-			! operatorDiagnosticsNode
-		) {
+		if ( ! retrievalStateNode && ! operatorDiagnosticsNode ) {
 			return null;
 		}
 
@@ -1874,14 +1586,12 @@ export default function AgentChat( {
 			'div',
 			{ className: 'frontend-agent-chat__chat-header' },
 			retrievalStateNode,
-			runEventStateNode,
 			operatorDiagnosticsNode
 		);
 	}, [
 		canShowOperatorDiagnostics,
 		operatorDiagnosticsMetadata,
 		retrievalState,
-		runEventState,
 	] );
 	const chatAdapter = useMemo(
 		() =>
@@ -2064,12 +1774,19 @@ export default function AgentChat( {
 					)
 			);
 		};
-		const questionRenderers = createQuestionToolRenderers( {
+		const questionRenderers = createPresentQuestionToolRenderers( {
+			QuestionCard,
+			onAnswer: ( answer, _choice, group ) =>
+				answerQuestion( group.id, answer ),
 			disabled: () => chat.isProcessing,
-			isAnswered: ( groupId ) =>
-				answeredQuestions[ groupId ] ??
-				transcriptAnsweredQuestions[ groupId ],
-			onAnswer: answerQuestion,
+			answered: ( group ) =>
+				Boolean(
+					answeredQuestions[ group.id ] ??
+						transcriptAnsweredQuestions[ group.id ]
+				),
+			answeredChoice: ( group ) =>
+				answeredQuestions[ group.id ] ??
+				transcriptAnsweredQuestions[ group.id ],
 		} );
 
 		return {
