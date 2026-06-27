@@ -90,7 +90,7 @@ function mount( container: HTMLElement, component: ReactElement ): void {
 
 function init(): void {
 	const el = document.querySelector< HTMLElement >( MOUNT_SELECTOR );
-	if ( ! el || el.dataset.ecMounted === 'true' ) {
+	if ( ! el || el.dataset.frontendAgentChatMounted === 'true' ) {
 		return;
 	}
 
@@ -99,7 +99,7 @@ function init(): void {
 		return;
 	}
 
-	el.dataset.ecMounted = 'true';
+	el.dataset.frontendAgentChatMounted = 'true';
 	mount(
 		el,
 		createElement( AgentChat, {
