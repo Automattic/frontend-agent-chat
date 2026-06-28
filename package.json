@@ -1,6 +1,6 @@
 {
 	"name": "frontend-agent-chat",
-	"version": "0.1.0",
+	"version": "0.14.4",
 	"description": "Floating frontend chat widget for WordPress agents.",
 	"private": true,
 	"scripts": {

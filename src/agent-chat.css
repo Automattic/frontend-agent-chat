@@ -332,33 +332,6 @@
 	overflow: hidden;
 }
 
-.frontend-agent-chat__body .ec-chat {
-	--ec-chat-bg: var(--frontend-agent-chat-drawer-bg, #f8fafc);
-	--ec-chat-text: var(--frontend-agent-chat-text-primary, #1e293b);
-	--ec-chat-text-muted: var(--frontend-agent-chat-text-muted, #94a3b8);
-	--ec-chat-border: var(--frontend-agent-chat-border-color, #e2e8f0);
-	--ec-chat-user-bg: var(--frontend-agent-chat-accent, #2563eb);
-	--ec-chat-user-text: #fff;
-	--ec-chat-assistant-bg: var(--frontend-agent-chat-message-bg, #fff);
-	--ec-chat-assistant-text: var(--frontend-agent-chat-text-primary, #1e293b);
-	--ec-chat-input-bg: var(--frontend-agent-chat-input-bg, #fff);
-	--ec-chat-input-border: var(--frontend-agent-chat-border-color, #e2e8f0);
-	--ec-chat-input-focus-border: var(--frontend-agent-chat-accent, #2563eb);
-	--ec-chat-send-bg: var(--frontend-agent-chat-accent, #2563eb);
-	--ec-chat-send-text: #fff;
-	--ec-chat-tool-bg: var(--frontend-agent-chat-message-bg, #fff);
-	--ec-chat-tool-border: var(--frontend-agent-chat-border-color, #e2e8f0);
-	--ec-chat-session-hover-bg: var(--frontend-agent-chat-border-color, #e2e8f0);
-	--ec-chat-font-family: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
-	--ec-chat-font-size: var(--frontend-agent-chat-font-size, 15px);
-	--ec-chat-border-radius: 14px;
-
-	background: var(--ec-chat-bg);
-	height: 100%;
-	min-height: 0;
-	border-radius: 0;
-}
-
 .frontend-agent-chat__body .agenttic-embedded {
 	--color-background: var(--frontend-agent-chat-drawer-bg, #f8fafc);
 	--color-foreground: var(--frontend-agent-chat-text-primary, #1e293b);
@@ -438,13 +411,6 @@
 	border-color: var(--frontend-agent-chat-accent, #2563eb);
 	outline: 2px solid var(--frontend-agent-chat-accent, #2563eb);
 	outline-offset: 2px;
-}
-
-.frontend-agent-chat__body .ec-chat-messages,
-.frontend-agent-chat__body .ec-chat-input-area,
-.frontend-agent-chat__body .ec-chat-session-switcher,
-.frontend-agent-chat__body .ec-chat-session-switcher__panel {
-	background: var(--ec-chat-bg);
 }
 
 .frontend-agent-chat__persistence {
