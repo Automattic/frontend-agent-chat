@@ -5,10 +5,11 @@
  * The Chat component stays mounted when the drawer closes so session
  * state, messages, and scroll position survive open/close cycles.
  *
- * When AI uses a pending-action tool (edit_post_blocks, replace_post_blocks,
- * insert_content) with preview mode, the tool result is rendered as a
- * DiffCard with Accept/Reject buttons instead of raw JSON. Accept/Reject
- * hit the frontend adapter's Agents API pending-action resolution endpoint.
+ * When an agent ability requests approval, its tool result carries the generic
+ * agents/ pending-action envelope. Any such result — detected by shape, never
+ * by tool name — is rendered as agenttic's DiffCard with Accept/Reject buttons
+ * instead of raw JSON. Accept/Reject hit the frontend adapter's Agents API
+ * pending-action resolution endpoint.
  *
  * @package
  * @since 0.3.0
@@ -21,7 +22,6 @@ import {
 	createAgentsApiChatAdapter,
 	createPresentQuestionToolRenderers,
 	groupToolMessages,
-	renderToolGroups,
 	useAgentsApiChat,
 	normalizeRunEvent,
 } from '@automattic/agenttic-client/agents-api';
@@ -39,10 +39,14 @@ import type {
 } from '@automattic/agenttic-client/agents-api';
 import {
 	AgentUI,
+	DiffCard,
 	EmbeddedAgentUISuggestions,
 	QuestionCard,
 } from '@automattic/agenttic-ui/embedded-agent-ui';
-import type { Suggestion as ChatMessageSuggestion } from '@automattic/agenttic-ui/embedded-agent-ui';
+import type {
+	DiffDecision,
+	Suggestion as ChatMessageSuggestion,
+} from '@automattic/agenttic-ui/embedded-agent-ui';
 import type { ChangeEvent, ReactNode } from 'react';
 
 /**
@@ -196,6 +200,97 @@ function getToolPayload(
 	}
 	const raw = group.result?.message?.raw ?? group.call?.message?.raw ?? {};
 	return raw && typeof raw === 'object' ? raw : {};
+}
+
+function asRecord( value: unknown ): Record< string, unknown > {
+	return value && typeof value === 'object'
+		? ( value as Record< string, unknown > )
+		: {};
+}
+
+/**
+ * Generic agents/ pending-action shape, projected from the Automattic
+ * agents-api `WP_Agent_Pending_Action` contract: `{ action_id, kind, summary,
+ * preview, status, ... }`. The plugin keys ONLY on this generic envelope —
+ * never on any product tool name or product-specific payload nesting — so any
+ * agent ability that requests approval renders the same diff card.
+ */
+interface GenericPendingAction {
+	action_id: string;
+	summary?: string;
+	kind?: string;
+	status?: string;
+	/**
+	 * Product-defined (`mixed`) preview. Treated opaquely; only consumed when it
+	 * is a plain string. The card never decodes a product-specific object shape.
+	 */
+	preview?: unknown;
+}
+
+/**
+ * Detect the generic agents/ pending-action envelope on a tool group, by SHAPE.
+ *
+ * A pending action reaches the client through the agents-api approval contract,
+ * either as the `WP_Agent_Pending_Action` value object (`action_id` + `status`)
+ * or wrapped in an `approval_required` message envelope whose payload carries
+ * the same generic fields. We probe only these generic agents-api containers —
+ * an `action_id` plus a `status`/`approval_required` signal — and never inspect
+ * tool names or product-specific payload shapes.
+ *
+ * @param group Tool group to inspect.
+ * @return The generic pending action, or null when the group is not one.
+ */
+function readGenericPendingAction(
+	group: AgentsApiToolGroup
+): GenericPendingAction | null {
+	const payload = getToolPayload( group );
+	const envelopePayload = asRecord( payload.payload );
+	const isApprovalRequired =
+		payload.type === 'approval_required' ||
+		envelopePayload.type === 'approval_required';
+
+	// Generic agents-api containers that may carry the pending-action fields:
+	// the result itself (flat value object) and the approval_required envelope
+	// payload. No product-specific keys are consulted.
+	const containers: Record< string, unknown >[] = [ payload, envelopePayload ];
+
+	for ( const container of containers ) {
+		const actionId = container.action_id;
+		if ( typeof actionId !== 'string' || ! actionId ) {
+			continue;
+		}
+		const status =
+			typeof container.status === 'string' ? container.status : undefined;
+		// Require a generic pending-action signal so an unrelated tool result
+		// that merely exposes an id is never hijacked into a diff card.
+		if ( ! status && ! isApprovalRequired ) {
+			continue;
+		}
+		const summary =
+			typeof container.summary === 'string'
+				? container.summary
+				: typeof payload.summary === 'string'
+				? payload.summary
+				: undefined;
+		const kind =
+			typeof container.kind === 'string'
+				? container.kind
+				: typeof payload.kind === 'string'
+				? payload.kind
+				: undefined;
+		return {
+			action_id: actionId,
+			summary,
+			kind,
+			status,
+			preview:
+				container.preview !== undefined
+					? container.preview
+					: payload.preview,
+		};
+	}
+
+	return null;
 }
 
 function hasToolResult( group: AgentsApiToolGroup ): boolean {
@@ -1722,58 +1817,6 @@ export default function AgentChat( {
 						JSON.stringify( getToolPayload( group ), null, 2 )
 				  );
 		};
-		const diffRenderer = ( group: AgentsApiToolGroup ) => {
-			const payload = getToolPayload( group );
-			const actionId = String(
-				payload.action_id ??
-					payload.actionId ??
-					payload.pending_action_id ??
-					''
-			);
-			return createElement(
-				'div',
-				{ className: 'frontend-agent-chat__tool-card' },
-				createElement(
-					'div',
-					{ className: 'frontend-agent-chat__tool-card-title' },
-					String( payload.title ?? group.name )
-				),
-				createElement(
-					'pre',
-					null,
-					JSON.stringify( payload.diff ?? payload, null, 2 )
-				),
-				actionId &&
-					createElement(
-						'div',
-						{ className: 'frontend-agent-chat__tool-card-actions' },
-						createElement(
-							'button',
-							{
-								type: 'button',
-								onClick: () =>
-									resolvePendingAction(
-										actionId,
-										'accepted'
-									),
-							},
-							__( 'Accept', 'frontend-agent-chat' )
-						),
-						createElement(
-							'button',
-							{
-								type: 'button',
-								onClick: () =>
-									resolvePendingAction(
-										actionId,
-										'rejected'
-									),
-							},
-							__( 'Reject', 'frontend-agent-chat' )
-						)
-					)
-			);
-		};
 		const questionRenderers = createPresentQuestionToolRenderers( {
 			QuestionCard,
 			onAnswer: ( answer, _choice, group ) =>
@@ -1795,9 +1838,6 @@ export default function AgentChat( {
 			artifact_status: artifactRenderer,
 			artifact_status_update: artifactRenderer,
 			artifact_task_status: artifactRenderer,
-			edit_post_blocks: diffRenderer,
-			replace_post_blocks: diffRenderer,
-			insert_content: diffRenderer,
 			...questionRenderers,
 		};
 	}, [ answerQuestion, answeredQuestions, chat, transcriptAnsweredQuestions ] );
@@ -1818,10 +1858,45 @@ export default function AgentChat( {
 				return message;
 			}
 
-			const renderedTools = renderToolGroups(
-				toolGroups,
-				toolRenderers
-			).filter( Boolean );
+			const renderedTools = toolGroups
+				.map( ( group ): ReactNode => {
+					// Generic agents/ pending action → agenttic DiffCard. Keyed
+					// by shape, so any approval-gated ability renders here
+					// regardless of tool name.
+					const pending = readGenericPendingAction( group );
+					if ( pending ) {
+						const resolved: DiffDecision | undefined =
+							pending.status === 'accepted'
+								? 'accepted'
+								: pending.status === 'rejected'
+								? 'rejected'
+								: undefined;
+						// Baseline generic diff body: render a string preview
+						// verbatim, otherwise fall back to the summary. A richer
+						// old↔new view would require a generic diff-preview
+						// contract on the agents/ envelope (a future agents-api
+						// addition); until then the product-defined `preview`
+						// object shape is intentionally left undecoded.
+						const diff =
+							typeof pending.preview === 'string'
+								? pending.preview
+								: pending.summary ?? pending.kind ?? '';
+						return createElement( DiffCard, {
+							key: group.id,
+							title: pending.summary ?? pending.kind,
+							diff,
+							resolved,
+							disabled: chat.isProcessing,
+							onResolve: ( decision: DiffDecision ) =>
+								resolvePendingAction(
+									pending.action_id,
+									decision
+								),
+						} );
+					}
+					return toolRenderers[ group.name ]?.( group ) ?? null;
+				} )
+				.filter( Boolean );
 
 			if ( renderedTools.length === 0 ) {
 				return message;
@@ -1843,7 +1918,7 @@ export default function AgentChat( {
 				],
 			};
 		} );
-	}, [ chat.messages, toolRenderers ] );
+	}, [ chat.messages, chat.isProcessing, toolRenderers ] );
 	const submitMessage = useCallback(
 		( message: string, files?: File[] ) =>
 			chat.sendMessage( message, canUploadFiles ? files : undefined ),
