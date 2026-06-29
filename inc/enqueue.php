@@ -142,7 +142,7 @@ function frontend_agent_chat_sanitize_chat_context( $context ): array {
  */
 function frontend_agent_chat_sanitize_header_controls( $controls ): array {
 	$defaults = array(
-		'agent_selector'    => true,
+		'agent_selector'   => true,
 		'session_controls' => true,
 		'expand_button'    => true,
 		'close_button'     => true,
@@ -155,7 +155,7 @@ function frontend_agent_chat_sanitize_header_controls( $controls ): array {
 	$controls = wp_parse_args( $controls, $defaults );
 
 	return array(
-		'agentSelector'    => (bool) $controls['agent_selector'],
+		'agentSelector'   => (bool) $controls['agent_selector'],
 		'sessionControls' => (bool) $controls['session_controls'],
 		'expandButton'    => (bool) $controls['expand_button'],
 		'closeButton'     => (bool) $controls['close_button'],

@@ -51,11 +51,13 @@ declare global {
 				closeButton?: boolean;
 			};
 			isLoggedIn?: boolean;
-			loadingMessages?: boolean | {
-				mode?: 'default' | 'extend' | 'override';
-				messages?: string[];
-				interval?: number;
-			};
+			loadingMessages?:
+				| boolean
+				| {
+						mode?: 'default' | 'extend' | 'override';
+						messages?: string[];
+						interval?: number;
+				  };
 			persistenceCta?: {
 				message?: string;
 				actionLabel?: string;

@@ -1,3 +1,6 @@
+/**
+ * External dependencies
+ */
 import type { AgentsApiRunEvent } from '@automattic/agenttic-client/agents-api';
 
 export interface RunProgressSummary {
@@ -51,7 +54,10 @@ export function getRunEventState(
 		nextState.label = getEventLabel( event, metadata ) ?? nextState.label;
 
 		const timelineEntry = getRunTimelineEntry( event, metadata );
-		if ( timelineEntry && ! hasTimelineEntry( nextState.timeline, timelineEntry ) ) {
+		if (
+			timelineEntry &&
+			! hasTimelineEntry( nextState.timeline, timelineEntry )
+		) {
 			nextState.timeline.push( timelineEntry );
 		}
 
@@ -127,8 +133,6 @@ export function getRunProgressSummary(
 		metadata.message,
 		event.raw.message
 	);
-	const phase = readString( envelope.phase, metadata.phase );
-	const unit = readString( envelopeProgress.unit, envelope.unit, metadata.unit );
 	const hasProgressType = event.type.includes( 'progress' );
 
 	if (
@@ -140,6 +144,13 @@ export function getRunProgressSummary(
 	) {
 		return null;
 	}
+
+	const phase = readString( envelope.phase, metadata.phase );
+	const unit = readString(
+		envelopeProgress.unit,
+		envelope.unit,
+		metadata.unit
+	);
 
 	return { current, total, percent, unit, label, phase };
 }
@@ -174,8 +185,12 @@ export function getRunDiagnosticSummaries(
 	const diagnostics = [
 		metadata.diagnostic,
 		envelope.diagnostic,
-		...( Array.isArray( metadata.diagnostics ) ? metadata.diagnostics : [] ),
-		...( Array.isArray( envelope.diagnostics ) ? envelope.diagnostics : [] ),
+		...( Array.isArray( metadata.diagnostics )
+			? metadata.diagnostics
+			: [] ),
+		...( Array.isArray( envelope.diagnostics )
+			? envelope.diagnostics
+			: [] ),
 		...objectMapValues( metadata.diagnostics ),
 		...objectMapValues( envelope.diagnostics ),
 		...( Array.isArray( metadata.warnings )
@@ -259,15 +274,17 @@ function getRunTimelineEntry(
 	event: AgentsApiRunEvent,
 	metadata: Record< string, unknown >
 ): RunTimelineEntry | null {
-	const envelope = getProgressEnvelope( event, metadata );
 	const label = getEventLabel( event, metadata );
 	if ( ! label ) {
 		return null;
 	}
+	const envelope = getProgressEnvelope( event, metadata );
 	const phase = readString( envelope.phase, metadata.phase );
 
 	return {
-		id: readString( event.id, metadata.id ) ?? `${ event.type }:${ phase ?? label }`,
+		id:
+			readString( event.id, metadata.id ) ??
+			`${ event.type }:${ phase ?? label }`,
 		type: event.type,
 		label,
 		status: readString( envelope.status, event.status ),
@@ -284,9 +301,27 @@ function normalizeArtifact( value: unknown ): RunArtifactSummary | null {
 	}
 
 	const record = asRecord( value );
-	const url = readString( record.url, record.href, record.preview_url, record.previewUrl, record.path );
-	const id = readString( record.id, record.ref, record.artifact_id, record.artifactId, record.path );
-	const label = readString( record.label, record.title, record.name, id, url );
+	const url = readString(
+		record.url,
+		record.href,
+		record.preview_url,
+		record.previewUrl,
+		record.path
+	);
+	const id = readString(
+		record.id,
+		record.ref,
+		record.artifact_id,
+		record.artifactId,
+		record.path
+	);
+	const label = readString(
+		record.label,
+		record.title,
+		record.name,
+		id,
+		url
+	);
 	if ( ! label ) {
 		return null;
 	}
