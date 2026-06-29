@@ -97,7 +97,9 @@ const SOURCE_COUNT_PATHS = [
 	[ 'citations' ],
 ];
 
-export function getRetrievalState( metadata: Record< string, unknown > | undefined ): RetrievalState | null {
+export function getRetrievalState(
+	metadata: Record< string, unknown > | undefined
+): RetrievalState | null {
 	if ( ! metadata ) {
 		return null;
 	}
@@ -113,12 +115,18 @@ export function getRetrievalState( metadata: Record< string, unknown > | undefin
 	return createRetrievalState( kind, sourceCount );
 }
 
-function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ): RetrievalState {
+function createRetrievalState(
+	kind: RetrievalStateKind,
+	sourceCount?: number
+): RetrievalState {
 	if ( kind === 'grounded' ) {
 		return {
 			kind,
 			label: 'Grounded in retrieved context',
-			description: describeSources( sourceCount, 'Retrieved context was available for this answer.' ),
+			description: describeSources(
+				sourceCount,
+				'Retrieved context was available for this answer.'
+			),
 			sourceCount,
 		};
 	}
@@ -127,7 +135,10 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 		return {
 			kind,
 			label: 'Partial context available',
-			description: describeSources( sourceCount, 'Retrieved context may be incomplete.' ),
+			description: describeSources(
+				sourceCount,
+				'Retrieved context may be incomplete.'
+			),
 			sourceCount,
 		};
 	}
@@ -136,7 +147,8 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 		return {
 			kind,
 			label: 'No relevant sources found',
-			description: 'The agent did not find retrieved context that matched this answer.',
+			description:
+				'The agent did not find retrieved context that matched this answer.',
 			sourceCount,
 		};
 	}
@@ -145,7 +157,8 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 		return {
 			kind,
 			label: 'Some sources need permission',
-			description: 'The agent could not use one or more sources for this request.',
+			description:
+				'The agent could not use one or more sources for this request.',
 			sourceCount,
 		};
 	}
@@ -154,7 +167,8 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 		return {
 			kind,
 			label: 'Source access was restricted',
-			description: 'The answer may exclude sources that are restricted for this chat.',
+			description:
+				'The answer may exclude sources that are restricted for this chat.',
 			sourceCount,
 		};
 	}
@@ -163,7 +177,8 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 		return {
 			kind,
 			label: 'Sources may be stale',
-			description: 'Retrieved context was available, but some source freshness warnings were reported.',
+			description:
+				'Retrieved context was available, but some source freshness warnings were reported.',
 			sourceCount,
 		};
 	}
@@ -176,7 +191,10 @@ function createRetrievalState( kind: RetrievalStateKind, sourceCount?: number ):
 	};
 }
 
-function describeSources( sourceCount: number | undefined, fallback: string ): string {
+function describeSources(
+	sourceCount: number | undefined,
+	fallback: string
+): string {
 	if ( sourceCount === undefined ) {
 		return fallback;
 	}
@@ -188,28 +206,66 @@ function describeSources( sourceCount: number | undefined, fallback: string ): s
 	return `${ sourceCount } sources were available for this answer.`;
 }
 
-function inferStatus( metadata: Record< string, unknown >, sourceCount: number | undefined ): RetrievalStateKind | null {
+function inferStatus(
+	metadata: Record< string, unknown >,
+	sourceCount: number | undefined
+): RetrievalStateKind | null {
 	if ( readBoolean( metadata, [ 'retrieval_error', 'retrievalError' ] ) ) {
 		return 'error';
 	}
 
-	if ( readBoolean( metadata, [ 'no_answer', 'noAnswer', 'no_relevant_source', 'noRelevantSource' ] ) ) {
+	if (
+		readBoolean( metadata, [
+			'no_answer',
+			'noAnswer',
+			'no_relevant_source',
+			'noRelevantSource',
+		] )
+	) {
 		return 'no_answer';
 	}
 
-	if ( readBoolean( metadata, [ 'partial_evidence', 'partialEvidence', 'partial_context', 'partialContext' ] ) ) {
+	if (
+		readBoolean( metadata, [
+			'partial_evidence',
+			'partialEvidence',
+			'partial_context',
+			'partialContext',
+		] )
+	) {
 		return 'partial';
 	}
 
-	if ( readBoolean( metadata, [ 'permission_denied', 'permissionDenied', 'access_denied', 'accessDenied' ] ) ) {
+	if (
+		readBoolean( metadata, [
+			'permission_denied',
+			'permissionDenied',
+			'access_denied',
+			'accessDenied',
+		] )
+	) {
 		return 'permission_denied';
 	}
 
-	if ( readBoolean( metadata, [ 'source_restricted', 'sourceRestricted', 'sources_restricted', 'sourcesRestricted' ] ) ) {
+	if (
+		readBoolean( metadata, [
+			'source_restricted',
+			'sourceRestricted',
+			'sources_restricted',
+			'sourcesRestricted',
+		] )
+	) {
 		return 'source_restricted';
 	}
 
-	if ( readBoolean( metadata, [ 'stale_source', 'staleSource', 'stale_sources', 'staleSources' ] ) ) {
+	if (
+		readBoolean( metadata, [
+			'stale_source',
+			'staleSource',
+			'stale_sources',
+			'staleSources',
+		] )
+	) {
 		return 'stale';
 	}
 
@@ -220,14 +276,19 @@ function inferStatus( metadata: Record< string, unknown >, sourceCount: number |
 	return null;
 }
 
-function readStatus( metadata: Record< string, unknown > ): RetrievalStateKind | null {
+function readStatus(
+	metadata: Record< string, unknown >
+): RetrievalStateKind | null {
 	for ( const path of STATUS_PATHS ) {
 		const value = readPath( metadata, path );
 		if ( typeof value !== 'string' ) {
 			continue;
 		}
 
-		const normalized = value.trim().toLowerCase().replace( /[\s-]+/g, '_' );
+		const normalized = value
+			.trim()
+			.toLowerCase()
+			.replace( /[\s-]+/g, '_' );
 		if ( normalized in STATUS_ALIASES ) {
 			return STATUS_ALIASES[ normalized ];
 		}
@@ -236,10 +297,16 @@ function readStatus( metadata: Record< string, unknown > ): RetrievalStateKind |
 	return null;
 }
 
-function readSourceCount( metadata: Record< string, unknown > ): number | undefined {
+function readSourceCount(
+	metadata: Record< string, unknown >
+): number | undefined {
 	for ( const path of SOURCE_COUNT_PATHS ) {
 		const value = readPath( metadata, path );
-		if ( typeof value === 'number' && Number.isFinite( value ) && value >= 0 ) {
+		if (
+			typeof value === 'number' &&
+			Number.isFinite( value ) &&
+			value >= 0
+		) {
 			return Math.floor( value );
 		}
 
@@ -251,11 +318,17 @@ function readSourceCount( metadata: Record< string, unknown > ): number | undefi
 	return undefined;
 }
 
-function readBoolean( metadata: Record< string, unknown >, keys: string[] ): boolean {
+function readBoolean(
+	metadata: Record< string, unknown >,
+	keys: string[]
+): boolean {
 	return keys.some( ( key ) => metadata[ key ] === true );
 }
 
-function readPath( metadata: Record< string, unknown >, path: string[] ): unknown {
+function readPath(
+	metadata: Record< string, unknown >,
+	path: string[]
+): unknown {
 	return path.reduce< unknown >( ( current, key ) => {
 		if ( ! isRecord( current ) ) {
 			return undefined;

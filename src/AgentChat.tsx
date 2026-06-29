@@ -228,6 +228,28 @@ interface GenericPendingAction {
 }
 
 /**
+ * Return the first string-valued entry found while scanning `keys` of each
+ * record in order. Used to coalesce a field that may live on either the flat
+ * tool payload or its approval envelope without nesting ternaries.
+ *
+ * @param records Records to scan, in priority order.
+ * @param key     Property name to read from each record.
+ * @return The first string value found, or undefined.
+ */
+function firstStringValue(
+	records: Record< string, unknown >[],
+	key: string
+): string | undefined {
+	for ( const record of records ) {
+		const value = record[ key ];
+		if ( typeof value === 'string' ) {
+			return value;
+		}
+	}
+	return undefined;
+}
+
+/**
  * Detect the generic agents/ pending-action envelope on a tool group, by SHAPE.
  *
  * A pending action reaches the client through the agents-api approval contract,
@@ -252,7 +274,10 @@ function readGenericPendingAction(
 	// Generic agents-api containers that may carry the pending-action fields:
 	// the result itself (flat value object) and the approval_required envelope
 	// payload. No product-specific keys are consulted.
-	const containers: Record< string, unknown >[] = [ payload, envelopePayload ];
+	const containers: Record< string, unknown >[] = [
+		payload,
+		envelopePayload,
+	];
 
 	for ( const container of containers ) {
 		const actionId = container.action_id;
@@ -266,18 +291,8 @@ function readGenericPendingAction(
 		if ( ! status && ! isApprovalRequired ) {
 			continue;
 		}
-		const summary =
-			typeof container.summary === 'string'
-				? container.summary
-				: typeof payload.summary === 'string'
-				? payload.summary
-				: undefined;
-		const kind =
-			typeof container.kind === 'string'
-				? container.kind
-				: typeof payload.kind === 'string'
-				? payload.kind
-				: undefined;
+		const summary = firstStringValue( [ container, payload ], 'summary' );
+		const kind = firstStringValue( [ container, payload ], 'kind' );
 		return {
 			action_id: actionId,
 			summary,
@@ -325,7 +340,8 @@ function deriveAnsweredQuestions(
 	for ( let index = 0; index < messages.length; index++ ) {
 		const groups = groupToolMessages( [ messages[ index ] ] ).filter(
 			( group ) =>
-				group.name === 'present_question' || group.name === 'ask_question'
+				group.name === 'present_question' ||
+				group.name === 'ask_question'
 		);
 		if ( groups.length === 0 ) {
 			continue;
@@ -753,38 +769,44 @@ function getSessionLabel(
 function getMostRecentSession(
 	sessions: AgentsApiSession[]
 ): AgentsApiSession | undefined {
-	return sessions.reduce< AgentsApiSession | undefined >( ( latest, session ) => {
-		if ( ! latest ) {
-			return session;
-		}
+	return sessions.reduce< AgentsApiSession | undefined >(
+		( latest, session ) => {
+			if ( ! latest ) {
+				return session;
+			}
 
-		const latestTime = Date.parse(
-			latest.updatedAt ||
-				latest.updated_at ||
-				latest.createdAt ||
-				latest.created_at ||
-				''
-		);
-		const sessionTime = Date.parse(
-			session.updatedAt ||
-				session.updated_at ||
-				session.createdAt ||
-				session.created_at ||
-				''
-		);
-		if ( Number.isNaN( sessionTime ) ) {
-			return latest;
-		}
+			const sessionTime = Date.parse(
+				session.updatedAt ||
+					session.updated_at ||
+					session.createdAt ||
+					session.created_at ||
+					''
+			);
+			if ( Number.isNaN( sessionTime ) ) {
+				return latest;
+			}
 
-		return Number.isNaN( latestTime ) || sessionTime > latestTime
-			? session
-			: latest;
-	}, undefined );
+			const latestTime = Date.parse(
+				latest.updatedAt ||
+					latest.updated_at ||
+					latest.createdAt ||
+					latest.created_at ||
+					''
+			);
+
+			return Number.isNaN( latestTime ) || sessionTime > latestTime
+				? session
+				: latest;
+		},
+		undefined
+	);
 }
 
 function getMessageText( message: AgentsApiMessage ): string {
 	return message.content
-		.filter( ( part ) => part.type === 'text' && typeof part.text === 'string' )
+		.filter(
+			( part ) => part.type === 'text' && typeof part.text === 'string'
+		)
 		.map( ( part ) => part.text )
 		.join( ' ' )
 		.replace( /\s+/g, ' ' )
@@ -792,7 +814,9 @@ function getMessageText( message: AgentsApiMessage ): string {
 }
 
 function getSessionTitleFromMessages( messages: AgentsApiMessage[] ): string {
-	const firstUserMessage = messages.find( ( message ) => message.role === 'user' );
+	const firstUserMessage = messages.find(
+		( message ) => message.role === 'user'
+	);
 	if ( ! firstUserMessage ) {
 		return '';
 	}
@@ -986,10 +1010,7 @@ async function fetchRunEvents(
 	metadata: Record< string, unknown >
 ): Promise< ChatRunEvent[] > {
 	const runIdentity = getRunIdentity( metadata );
-	if (
-		! runAdapter.listEvents ||
-		! runIdentity
-	) {
+	if ( ! runAdapter.listEvents || ! runIdentity ) {
 		return [];
 	}
 
@@ -1008,7 +1029,10 @@ function createMetadataRunEvent(
 	return normalizeRunEvent(
 		{
 			id: `metadata:${ runIdentity.runId }`,
-			type: metadata.progress || metadata.progress_envelope ? 'progress' : 'metadata',
+			type:
+				metadata.progress || metadata.progress_envelope
+					? 'progress'
+					: 'metadata',
 			run_id: runIdentity.runId,
 			session_id: runIdentity.sessionId,
 			status: typeof status === 'string' ? status : undefined,
@@ -1019,7 +1043,10 @@ function createMetadataRunEvent(
 }
 
 function getRunEventKey( event: ChatRunEvent ): string {
-	return event.id || `${ event.run_id }:${ event.type }:${ event.raw.message ?? '' }`;
+	return (
+		event.id ||
+		`${ event.run_id }:${ event.type }:${ event.raw.message ?? '' }`
+	);
 }
 
 /**
@@ -1475,7 +1502,8 @@ export default function AgentChat( {
 			const runIdentity = getRunIdentity( responseMetadata );
 			if ( runIdentity ) {
 				setActiveRunIdentity( runIdentity );
-				const metadataEvent = createMetadataRunEvent( responseMetadata );
+				const metadataEvent =
+					createMetadataRunEvent( responseMetadata );
 				if ( metadataEvent ) {
 					rememberRunEvents( [ metadataEvent ] );
 				}
@@ -1840,7 +1868,12 @@ export default function AgentChat( {
 			artifact_task_status: artifactRenderer,
 			...questionRenderers,
 		};
-	}, [ answerQuestion, answeredQuestions, chat, transcriptAnsweredQuestions ] );
+	}, [
+		answerQuestion,
+		answeredQuestions,
+		chat,
+		transcriptAnsweredQuestions,
+	] );
 	const displayMessages = useMemo( () => {
 		const toolResultIds = new Set(
 			chat.messages
@@ -1866,10 +1899,9 @@ export default function AgentChat( {
 					const pending = readGenericPendingAction( group );
 					if ( pending ) {
 						const resolved: DiffDecision | undefined =
-							pending.status === 'accepted'
-								? 'accepted'
-								: pending.status === 'rejected'
-								? 'rejected'
+							pending.status === 'accepted' ||
+							pending.status === 'rejected'
+								? pending.status
 								: undefined;
 						// Baseline generic diff body: render a string preview
 						// verbatim, otherwise fall back to the summary. A richer
@@ -1960,6 +1992,10 @@ export default function AgentChat( {
 		if ( latestSession?.id ) {
 			chat.loadSession( latestSession.id );
 		}
+		// Depend on the granular chat.* fields this effect reads, not the whole
+		// `chat` object: re-running on every chat mutation would re-trigger
+		// session bootstrap and clobber the one-shot bootstrap guard.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		activeAgentSlug,
 		chat.sessions,
@@ -2021,6 +2057,10 @@ export default function AgentChat( {
 			.finally( () => {
 				titleUpdateInFlightRef.current.delete( sessionId );
 			} );
+		// Depend on the granular chat.* fields this effect reads, not the whole
+		// `chat` object: re-running on every chat mutation would re-fire the
+		// title-generation request mid-conversation.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		activeAgentSlug,
 		agentFetch,
@@ -2222,7 +2262,10 @@ export default function AgentChat( {
 								type: 'button',
 								className: 'frontend-agent-chat__close',
 								onClick: close,
-								'aria-label': __( 'Close', 'frontend-agent-chat' ),
+								'aria-label': __(
+									'Close',
+									'frontend-agent-chat'
+								),
 							},
 							'\u00D7'
 						)

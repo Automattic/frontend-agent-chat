@@ -20,7 +20,7 @@ const DIAGNOSTICS_KEYS = [
 
 function asRecord( value: unknown ): Record< string, unknown > | null {
 	return value && typeof value === 'object' && ! Array.isArray( value )
-		? value as Record< string, unknown >
+		? ( value as Record< string, unknown > )
 		: null;
 }
 
@@ -43,10 +43,7 @@ function stringifyValue( value: unknown ): string {
 	}
 
 	if ( Array.isArray( value ) ) {
-		return value
-			.map( stringifyValue )
-			.filter( Boolean )
-			.join( ', ' );
+		return value.map( stringifyValue ).filter( Boolean ).join( ', ' );
 	}
 
 	if ( value && typeof value === 'object' ) {
@@ -67,7 +64,9 @@ function rowFromValue( value: unknown ): OperatorDiagnosticsRow | null {
 	}
 
 	const label = stringifyValue( record.label ?? record.name ?? record.key );
-	const rowValue = stringifyValue( record.value ?? record.message ?? record.detail );
+	const rowValue = stringifyValue(
+		record.value ?? record.message ?? record.detail
+	);
 	if ( ! label || ! rowValue ) {
 		return null;
 	}
@@ -75,14 +74,21 @@ function rowFromValue( value: unknown ): OperatorDiagnosticsRow | null {
 	return { label, value: rowValue };
 }
 
-function rowsFromRecord( source: Record< string, unknown > ): OperatorDiagnosticsRow[] {
+function rowsFromRecord(
+	source: Record< string, unknown >
+): OperatorDiagnosticsRow[] {
 	const explicitRows = source.rows ?? source.items;
 	if ( Array.isArray( explicitRows ) ) {
-		return explicitRows.map( rowFromValue ).filter( ( row ): row is OperatorDiagnosticsRow => !! row );
+		return explicitRows
+			.map( rowFromValue )
+			.filter( ( row ): row is OperatorDiagnosticsRow => !! row );
 	}
 
 	return Object.entries( source )
-		.filter( ( [ key ] ) => ! [ 'title', 'label', 'rows', 'items' ].includes( key ) )
+		.filter(
+			( [ key ] ) =>
+				! [ 'title', 'label', 'rows', 'items' ].includes( key )
+		)
 		.map( ( [ key, value ] ) => ( {
 			label: labelFromKey( key ),
 			value: stringifyValue( value ),
@@ -90,7 +96,9 @@ function rowsFromRecord( source: Record< string, unknown > ): OperatorDiagnostic
 		.filter( ( row ) => row.value !== '' );
 }
 
-function findDiagnosticsSource( metadata: Record< string, unknown > ): Record< string, unknown > | null {
+function findDiagnosticsSource(
+	metadata: Record< string, unknown >
+): Record< string, unknown > | null {
 	for ( const key of DIAGNOSTICS_KEYS ) {
 		const source = asRecord( metadata[ key ] );
 		if ( source ) {
@@ -101,12 +109,16 @@ function findDiagnosticsSource( metadata: Record< string, unknown > ): Record< s
 	return null;
 }
 
-export function getOperatorDiagnosticsRows( metadata: Record< string, unknown > ): OperatorDiagnosticsRow[] {
+export function getOperatorDiagnosticsRows(
+	metadata: Record< string, unknown >
+): OperatorDiagnosticsRow[] {
 	const source = findDiagnosticsSource( metadata );
 	return source ? rowsFromRecord( source ) : [];
 }
 
-export function getOperatorDiagnosticsPanel( metadata: Record< string, unknown > ): OperatorDiagnosticsPanel | null {
+export function getOperatorDiagnosticsPanel(
+	metadata: Record< string, unknown >
+): OperatorDiagnosticsPanel | null {
 	const source = findDiagnosticsSource( metadata );
 	if ( ! source ) {
 		return null;
@@ -124,6 +136,13 @@ export function getOperatorDiagnosticsPanel( metadata: Record< string, unknown >
 	};
 }
 
-export function shouldRenderOperatorDiagnostics( enabled: boolean, metadata: Record< string, unknown > | null | undefined ): boolean {
-	return enabled && !! metadata && getOperatorDiagnosticsRows( metadata ).length > 0;
+export function shouldRenderOperatorDiagnostics(
+	enabled: boolean,
+	metadata: Record< string, unknown > | null | undefined
+): boolean {
+	return (
+		enabled &&
+		!! metadata &&
+		getOperatorDiagnosticsRows( metadata ).length > 0
+	);
 }

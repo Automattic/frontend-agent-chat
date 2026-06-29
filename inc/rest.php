@@ -889,12 +889,13 @@ function frontend_agent_chat_rest_update_session_title( WP_REST_Request $request
 		return $result;
 	}
 
-	$session = is_array( $result['session'] ?? null ) ? $result['session'] : array();
+	$session             = is_array( $result['session'] ?? null ) ? $result['session'] : array();
+	$resolved_session_id = frontend_agent_chat_extract_session_id( $session );
 	return rest_ensure_response(
 		array(
 			'success' => true,
 			'data'    => array(
-				'session_id' => frontend_agent_chat_extract_session_id( $session ) ?: $session_id,
+				'session_id' => '' !== $resolved_session_id ? $resolved_session_id : $session_id,
 				'title'      => (string) ( $session['title'] ?? $title ),
 			),
 		)
@@ -1338,9 +1339,10 @@ function frontend_agent_chat_flatten_message_content( $content ): string {
  * @return array
  */
 function frontend_agent_chat_session_summary( array $session ): array {
-	$messages      = frontend_agent_chat_session_messages( $session );
-	$stored_title  = trim( (string) ( $session['title'] ?? '' ) );
-	$metadata      = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+	$messages     = frontend_agent_chat_session_messages( $session );
+	$stored_title = trim( (string) ( $session['title'] ?? '' ) );
+	$metadata     = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+
 	$metadata['has_stored_title'] = '' !== $stored_title;
 	$metadata['stored_title']     = $stored_title;
 	return array(

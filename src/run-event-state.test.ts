@@ -96,8 +96,12 @@ describe( 'run event state', () => {
 					total: 3,
 					percent: 67,
 				},
-				artifacts: { generated_site: { path: 'site.zip', kind: 'archive' } },
-				diagnostics: { worker: { level: 'info', message: 'Worker finished' } },
+				artifacts: {
+					generated_site: { path: 'site.zip', kind: 'archive' },
+				},
+				diagnostics: {
+					worker: { level: 'info', message: 'Worker finished' },
+				},
 			},
 		};
 
@@ -127,7 +131,11 @@ describe( 'run event state', () => {
 			getRunArtifactSummaries(
 				runEvent( 'artifact.ready', {
 					artifacts: [
-						{ id: 'log', title: 'Log bundle', url: 'https://example.com/log' },
+						{
+							id: 'log',
+							title: 'Log bundle',
+							url: 'https://example.com/log',
+						},
 					],
 					artifact_ref: 'summary.md',
 				} )
@@ -150,7 +158,9 @@ describe( 'run event state', () => {
 		expect(
 			getRunDiagnosticSummaries(
 				runEvent( 'diagnostic', {
-					diagnostics: [ { level: 'warning', message: 'Retrying provider' } ],
+					diagnostics: [
+						{ level: 'warning', message: 'Retrying provider' },
+					],
 					errors: [ 'Final artifact failed' ],
 				} )
 			)
