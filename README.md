@@ -111,11 +111,13 @@ Every token below defaults to agenttic's current value, so a site that sets noth
 | `--frontend-agent-chat-text-primary` | Primary text |
 | `--frontend-agent-chat-text-muted` | Muted / secondary text |
 | `--frontend-agent-chat-border-color` | Borders and dividers |
-| `--frontend-agent-chat-bg-muted` / `--frontend-agent-chat-muted-bg` | Muted surfaces |
+| `--frontend-agent-chat-bg-muted` | Muted surfaces |
 | `--frontend-agent-chat-message-bg` | Message bubble background |
 | `--frontend-agent-chat-input-bg` | Input field background |
 
 **Status colors**
+
+These semantic status tokens drive both the agenttic conversation surface and Frontend Agent Chat's own chrome (retrieval-state banners, tool-cards, artifact-cards, citation list, persistence notices) — a single token family covers the whole widget.
 
 | Token | Purpose |
 |-------|---------|

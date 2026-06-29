@@ -423,7 +423,7 @@
 	--color-foreground: var(--frontend-agent-chat-text-primary, #1e293b);
 	--color-primary: var(--frontend-agent-chat-accent, #2563eb);
 	--color-primary-foreground: var(--frontend-agent-chat-on-accent, #fff);
-	--color-muted: var(--frontend-agent-chat-muted-bg, #e2e8f0);
+	--color-muted: var(--frontend-agent-chat-bg-muted, #e2e8f0);
 	--color-muted-foreground: var(--frontend-agent-chat-text-muted, #64748b);
 	--color-popover: var(--frontend-agent-chat-drawer-bg, #f8fafc);
 	--color-popover-muted: var(--frontend-agent-chat-bg-muted, #f8fafc);
@@ -550,8 +550,8 @@
 }
 
 .frontend-agent-chat__persistence.has-warning {
-	color: var(--frontend-agent-chat-warning-text, #92400e);
-	background: var(--frontend-agent-chat-warning-bg, #fef3c7);
+	color: var(--frontend-agent-chat-warning, #92400e);
+	background: var(--frontend-agent-chat-warning-background, #fef3c7);
 }
 
 .frontend-agent-chat__persistence-action {
@@ -581,8 +581,8 @@
 }
 
 .frontend-agent-chat__retrieval-state.is-grounded {
-	border-color: var(--frontend-agent-chat-success-border, #bbf7d0);
-	background: var(--frontend-agent-chat-success-bg, #dcfce7);
+	border-color: var(--frontend-agent-chat-success, #bbf7d0);
+	background: var(--frontend-agent-chat-success-background, #dcfce7);
 }
 
 .frontend-agent-chat__retrieval-state.is-partial,
@@ -590,13 +590,13 @@
 .frontend-agent-chat__retrieval-state.is-permission-denied,
 .frontend-agent-chat__retrieval-state.is-source-restricted,
 .frontend-agent-chat__retrieval-state.is-stale {
-	border-color: var(--frontend-agent-chat-warning-border, #fde68a);
-	background: var(--frontend-agent-chat-warning-bg, #fef3c7);
+	border-color: var(--frontend-agent-chat-warning, #fde68a);
+	background: var(--frontend-agent-chat-warning-background, #fef3c7);
 }
 
 .frontend-agent-chat__retrieval-state.is-error {
-	border-color: var(--frontend-agent-chat-error-border, #fecaca);
-	background: var(--frontend-agent-chat-error-bg, #fef2f2);
+	border-color: var(--frontend-agent-chat-error, #fecaca);
+	background: var(--frontend-agent-chat-error-background, #fef2f2);
 }
 
 .frontend-agent-chat__retrieval-state-label {
@@ -648,7 +648,7 @@
 }
 
 .frontend-agent-chat__body a.ec-chat-citation:hover {
-	border-color: var(--frontend-agent-chat-accent-border, #bfdbfe);
+	border-color: var(--frontend-agent-chat-accent, #bfdbfe);
 	color: var(--frontend-agent-chat-accent, #2563eb);
 }
 
@@ -656,7 +656,7 @@
 	min-width: 18px;
 	height: 18px;
 	border-radius: 999px;
-	background: var(--frontend-agent-chat-muted-bg, #e2e8f0);
+	background: var(--frontend-agent-chat-bg-muted, #e2e8f0);
 	color: var(--frontend-agent-chat-text-muted, #475569);
 	font-size: 11px;
 	font-weight: 700;
@@ -688,8 +688,8 @@
 }
 
 .frontend-agent-chat__tool-card.has-error {
-	border-color: var(--frontend-agent-chat-error-border, #fecaca);
-	background: var(--frontend-agent-chat-error-bg, #fef2f2);
+	border-color: var(--frontend-agent-chat-error, #fecaca);
+	background: var(--frontend-agent-chat-error-background, #fef2f2);
 }
 
 .frontend-agent-chat__tool-card--generation.has-error {
@@ -712,8 +712,8 @@
 	margin: 8px 0 0;
 	padding: 8px 10px;
 	border-radius: 10px;
-	background: var(--frontend-agent-chat-error-detail-bg, rgba(127, 29, 29, 0.08));
-	color: var(--frontend-agent-chat-error-text, #991b1b);
+	background: var(--frontend-agent-chat-error-background, rgba(127, 29, 29, 0.08));
+	color: var(--frontend-agent-chat-error, #991b1b);
 	font-family: var(--frontend-agent-chat-monospace-font-family, ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace);
 	font-size: 12px;
 	line-height: 1.45;
@@ -722,11 +722,11 @@
 
 .frontend-agent-chat__artifact-card.is-running,
 .frontend-agent-chat__artifact-card.is-retrying {
-	border-color: var(--frontend-agent-chat-accent-border, #bfdbfe);
+	border-color: var(--frontend-agent-chat-accent, #bfdbfe);
 }
 
 .frontend-agent-chat__artifact-card.is-completed {
-	border-color: var(--frontend-agent-chat-success-border, #bbf7d0);
+	border-color: var(--frontend-agent-chat-success, #bbf7d0);
 }
 
 .frontend-agent-chat__artifact-card-header {
@@ -748,7 +748,7 @@
 	align-items: center;
 	padding: 3px 8px;
 	border-radius: 999px;
-	background: var(--frontend-agent-chat-muted-bg, #f1f5f9);
+	background: var(--frontend-agent-chat-bg-muted, #f1f5f9);
 	color: var(--frontend-agent-chat-text-muted, #475569);
 	font-size: 11px;
 	font-weight: 700;
@@ -760,18 +760,18 @@
 
 .frontend-agent-chat__artifact-card.is-running .frontend-agent-chat__artifact-card-status,
 .frontend-agent-chat__artifact-card.is-retrying .frontend-agent-chat__artifact-card-status {
-	background: var(--frontend-agent-chat-accent-soft-bg, #dbeafe);
+	background: color-mix(in srgb, var(--frontend-agent-chat-accent, #2563eb) 12%, transparent);
 	color: var(--frontend-agent-chat-accent, #2563eb);
 }
 
 .frontend-agent-chat__artifact-card.is-completed .frontend-agent-chat__artifact-card-status {
-	background: var(--frontend-agent-chat-success-bg, #dcfce7);
-	color: var(--frontend-agent-chat-success-text, #166534);
+	background: var(--frontend-agent-chat-success-background, #dcfce7);
+	color: var(--frontend-agent-chat-success, #166534);
 }
 
 .frontend-agent-chat__artifact-card.is-failed .frontend-agent-chat__artifact-card-status {
-	background: var(--frontend-agent-chat-error-detail-bg, rgba(127, 29, 29, 0.08));
-	color: var(--frontend-agent-chat-error-text, #991b1b);
+	background: var(--frontend-agent-chat-error-background, rgba(127, 29, 29, 0.08));
+	color: var(--frontend-agent-chat-error, #991b1b);
 }
 
 .frontend-agent-chat__artifact-card-thumbnails {
@@ -787,7 +787,7 @@
 	border: 1px solid var(--frontend-agent-chat-border-color, #e2e8f0);
 	border-radius: 10px;
 	object-fit: cover;
-	background: var(--frontend-agent-chat-muted-bg, #f8fafc);
+	background: var(--frontend-agent-chat-bg-muted, #f8fafc);
 }
 
 .frontend-agent-chat__artifact-card-meta {
