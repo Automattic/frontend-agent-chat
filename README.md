@@ -95,6 +95,66 @@ FAB -> Drawer -> <Chat>    -->   /frontend-agent-chat/v1/chat
 
 Class prefix: `frontend-agent-chat`. Theme tokens use `--frontend-agent-chat-*` variables.
 
+### Theming
+
+The chat conversation surface is rendered by [`@automattic/agenttic-ui`](https://github.com/Automattic/agenttic), which ships its own `.agenttic` design-system tokens (`--color-*`, `--font-*`, `--text-*`, `--spacing`, `--radius-*`, `--shadow-*`). Frontend Agent Chat bridges its own `--frontend-agent-chat-*` tokens onto that agenttic surface inside the `.frontend-agent-chat .agenttic` scope, so a downstream brand themes the entire widget — chrome and conversation — by setting only `--frontend-agent-chat-*` variables.
+
+Every token below defaults to agenttic's current value, so a site that sets nothing renders identically to a bare agenttic surface.
+
+**Surface colors**
+
+| Token | Purpose |
+|-------|---------|
+| `--frontend-agent-chat-accent` | Primary action color (FAB, links, focus ring) |
+| `--frontend-agent-chat-on-accent` | Foreground on accent fills |
+| `--frontend-agent-chat-drawer-bg` | Drawer / conversation background |
+| `--frontend-agent-chat-text-primary` | Primary text |
+| `--frontend-agent-chat-text-muted` | Muted / secondary text |
+| `--frontend-agent-chat-border-color` | Borders and dividers |
+| `--frontend-agent-chat-bg-muted` / `--frontend-agent-chat-muted-bg` | Muted surfaces |
+| `--frontend-agent-chat-message-bg` | Message bubble background |
+| `--frontend-agent-chat-input-bg` | Input field background |
+
+**Status colors**
+
+| Token | Purpose |
+|-------|---------|
+| `--frontend-agent-chat-link` | Link color (defaults to accent) |
+| `--frontend-agent-chat-error` / `--frontend-agent-chat-error-background` | Error text / fill |
+| `--frontend-agent-chat-success` / `--frontend-agent-chat-success-background` | Success text / fill |
+| `--frontend-agent-chat-warning` / `--frontend-agent-chat-warning-background` | Warning text / fill |
+
+**Typography**
+
+| Token | Purpose |
+|-------|---------|
+| `--frontend-agent-chat-font-family` / `--frontend-agent-chat-header-font-family` | Body / header font stack |
+| `--frontend-agent-chat-font-weight-medium` / `-semibold` / `-bold` | Font weights |
+| `--frontend-agent-chat-text-xs` / `-sm` / `-base` | Type scale |
+
+**Radii**
+
+| Token | Purpose |
+|-------|---------|
+| `--frontend-agent-chat-radius` | Base radius; `-xs` / `-sm` / `-md` / `-lg` / `-xl` derive from it |
+| `--frontend-agent-chat-radius-full` | Pill / circular radius |
+
+**Shadows**
+
+| Token | Purpose |
+|-------|---------|
+| `--frontend-agent-chat-shadow-sm` / `-lg` | Card / drawer elevation |
+| `--frontend-agent-chat-shadow-outline` / `-outline-strong` | Focus / outline rings |
+
+**Spacing**
+
+| Token | Purpose |
+|-------|---------|
+| `--frontend-agent-chat-spacing-base` | Base spacing unit; agenttic's `--spacing-1`…`--spacing-20` scale derives from it |
+| `--frontend-agent-chat-spacing-xs` / `-sm` / `-md` / `-lg` | Chrome spacing steps |
+
+**Dark mode** is the brand's responsibility: toggle `.dark` on the agenttic root (to use agenttic's dark defaults) or override the `--frontend-agent-chat-*` tokens inside an `@media (prefers-color-scheme: dark)` block.
+
 ## Development
 
 ```bash

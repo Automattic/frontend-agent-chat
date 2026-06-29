@@ -4,6 +4,72 @@
  * @package FrontendAgentChat
  */
 
+/*
+ * FAC token surface.
+ *
+ * Downstream brands set `--frontend-agent-chat-*` tokens to theme the widget.
+ * FAC bridges those tokens into agenttic-ui's `--color-*` / `--font-*` /
+ * `--spacing` / `--radius-*` / `--shadow-*` surface inside the
+ * `.frontend-agent-chat .agenttic` scope (see below). Every token here
+ * defaults to agenttic's current value, so with no brand-supplied overrides
+ * the rendered UI is identical to a bare agenttic surface.
+ *
+ * Dark mode: this bridge is unconditional — brand-supplied values always win.
+ * Agenttic ships a `.agenttic.dark` block; if a brand wants dark mode it
+ * should either toggle the `.dark` class on the agenttic root (and let
+ * agenttic's defaults take over) or provide its own
+ * `@media (prefers-color-scheme: dark)` override of these FAC tokens.
+ */
+:root {
+	/*
+	 * Status / semantic colors.
+	 *
+	 * Defaults mirror agenttic-ui's own `--color-*` defaults verbatim so a
+	 * site that sets no FAC tokens renders identically to a bare agenttic
+	 * surface. agenttic ships: link = primary, error = #E7000B on #FCF1F1,
+	 * success/warning text = foreground on #F1F7F1 / #F8F3E7 backgrounds.
+	 */
+	--frontend-agent-chat-link: var(--frontend-agent-chat-accent, #2563eb);
+	--frontend-agent-chat-error: #e7000b;
+	--frontend-agent-chat-error-background: #fcf1f1;
+	--frontend-agent-chat-success: var(--frontend-agent-chat-text-primary, #1e293b);
+	--frontend-agent-chat-success-background: #f1f7f1;
+	--frontend-agent-chat-warning: var(--frontend-agent-chat-text-primary, #1e293b);
+	--frontend-agent-chat-warning-background: #f8f3e7;
+	--frontend-agent-chat-on-accent: #fff;
+
+	/* Typography weights and sizes. */
+	--frontend-agent-chat-font-weight-medium: 450;
+	--frontend-agent-chat-font-weight-semibold: 500;
+	--frontend-agent-chat-font-weight-bold: 600;
+	--frontend-agent-chat-text-xs: 0.8125rem;
+	--frontend-agent-chat-text-sm: 0.875rem;
+	--frontend-agent-chat-text-base: 0.9375rem;
+
+	/*
+	 * Agenttic derives `--spacing-1` … `--spacing-20` from a single
+	 * `--spacing` base via `calc(var(--spacing) * N)`. Overriding the base
+	 * cascades through all of them — bridging 14 individual spacing tokens
+	 * would be the wrong shape.
+	 */
+	--frontend-agent-chat-spacing-base: 0.25rem;
+
+	/* Radii. `--frontend-agent-chat-radius` is the base; the rest derive from it. */
+	--frontend-agent-chat-radius: 1rem;
+	--frontend-agent-chat-radius-xs: calc(var(--frontend-agent-chat-radius) - 10px);
+	--frontend-agent-chat-radius-sm: calc(var(--frontend-agent-chat-radius) - 8px);
+	--frontend-agent-chat-radius-md: calc(var(--frontend-agent-chat-radius) - 2px);
+	--frontend-agent-chat-radius-lg: var(--frontend-agent-chat-radius);
+	--frontend-agent-chat-radius-xl: calc(var(--frontend-agent-chat-radius) + 8px);
+	--frontend-agent-chat-radius-full: 9999px;
+
+	/* Shadows. Defaults copied verbatim from agenttic-ui global.css so the no-brand-set behavior is identical. */
+	--frontend-agent-chat-shadow-sm: 0 0 0 1px color-mix(in srgb, var(--color-foreground) 10%, transparent), 0 0 6px color-mix(in srgb, var(--color-foreground) 5%, transparent);
+	--frontend-agent-chat-shadow-lg: 0 0 0 1px rgba(0, 0, 0, .075), 0 2px 24px rgba(0, 0, 0, .075);
+	--frontend-agent-chat-shadow-outline: 0 0 0 1px color-mix(in srgb, var(--color-foreground) 10%, transparent);
+	--frontend-agent-chat-shadow-outline-strong: 0 0 0 1px color-mix(in srgb, var(--color-foreground) 25%, transparent);
+}
+
 .frontend-agent-chat {
 	position: fixed;
 	z-index: 9999;
@@ -332,16 +398,75 @@
 	overflow: hidden;
 }
 
-.frontend-agent-chat__body .agenttic-embedded {
+/*
+ * Bridge: FAC tokens -> agenttic-ui tokens.
+ *
+ * Selector scope: `.frontend-agent-chat .agenttic` covers both the bare
+ * `.agenttic` root that agenttic-ui applies and the `.agenttic-embedded`
+ * variant (agenttic-ui's EmbeddedAgentUI ships `className="agenttic
+ * agenttic-embedded ..."`). Agenttic components that mount via Radix
+ * portals (Suggestions dropdown, etc.) use `closest(".agenttic")` as the
+ * portal container, so portaled content lives *inside* the `.agenttic`
+ * ancestor and inherits these bridged values automatically.
+ *
+ * Spacing: agenttic's `--spacing-1`..`--spacing-20` are declared as
+ * `calc(var(--spacing) * N)`. Overriding `--spacing` here re-resolves the
+ * entire scale, so we bridge a single base instead of 14 individual tokens.
+ *
+ * Font stack: bridged into `--font-sans` so agenttic surfaces inherit the
+ * brand font, in addition to the legacy `font-family` declaration below.
+ */
+.frontend-agent-chat .agenttic,
+.frontend-agent-chat .agenttic-embedded {
+	/* Color surface. */
 	--color-background: var(--frontend-agent-chat-drawer-bg, #f8fafc);
 	--color-foreground: var(--frontend-agent-chat-text-primary, #1e293b);
 	--color-primary: var(--frontend-agent-chat-accent, #2563eb);
-	--color-primary-foreground: #fff;
+	--color-primary-foreground: var(--frontend-agent-chat-on-accent, #fff);
 	--color-muted: var(--frontend-agent-chat-muted-bg, #e2e8f0);
 	--color-muted-foreground: var(--frontend-agent-chat-text-muted, #64748b);
 	--color-popover: var(--frontend-agent-chat-drawer-bg, #f8fafc);
 	--color-popover-muted: var(--frontend-agent-chat-bg-muted, #f8fafc);
 	--color-ring: var(--frontend-agent-chat-accent, #2563eb);
+
+	/* Status / link colors — previously fell through to agenttic defaults. */
+	--color-link: var(--frontend-agent-chat-link, var(--color-primary));
+	--color-error: var(--frontend-agent-chat-error, #e7000b);
+	--color-error-background: var(--frontend-agent-chat-error-background, #fcf1f1);
+	--color-success: var(--frontend-agent-chat-success, var(--color-foreground));
+	--color-success-background: var(--frontend-agent-chat-success-background, #f1f7f1);
+	--color-warning: var(--frontend-agent-chat-warning, var(--color-foreground));
+	--color-warning-background: var(--frontend-agent-chat-warning-background, #f8f3e7);
+
+	/* Typography. */
+	--font-sans: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+	--font-weight-medium: var(--frontend-agent-chat-font-weight-medium, 450);
+	--font-weight-semibold: var(--frontend-agent-chat-font-weight-semibold, 500);
+	--font-weight-bold: var(--frontend-agent-chat-font-weight-bold, 600);
+	--text-xs: var(--frontend-agent-chat-text-xs, 0.8125rem);
+	--text-sm: var(--frontend-agent-chat-text-sm, 0.875rem);
+	--text-base: var(--frontend-agent-chat-text-base, 0.9375rem);
+
+	/* Spacing base — cascades through agenttic's derived --spacing-N scale. */
+	--spacing: var(--frontend-agent-chat-spacing-base, 0.25rem);
+
+	/* Radii. */
+	--radius: var(--frontend-agent-chat-radius, 1rem);
+	--radius-xs: var(--frontend-agent-chat-radius-xs, calc(var(--radius) - 10px));
+	--radius-sm: var(--frontend-agent-chat-radius-sm, calc(var(--radius) - 8px));
+	--radius-md: var(--frontend-agent-chat-radius-md, calc(var(--radius) - 2px));
+	--radius-lg: var(--frontend-agent-chat-radius-lg, var(--radius));
+	--radius-xl: var(--frontend-agent-chat-radius-xl, calc(var(--radius) + 8px));
+	--radius-full: var(--frontend-agent-chat-radius-full, 9999px);
+
+	/* Shadows. */
+	--shadow-sm: var(--frontend-agent-chat-shadow-sm);
+	--shadow-lg: var(--frontend-agent-chat-shadow-lg);
+	--shadow-outline: var(--frontend-agent-chat-shadow-outline);
+	--shadow-outline-strong: var(--frontend-agent-chat-shadow-outline-strong);
+}
+
+.frontend-agent-chat__body .agenttic-embedded {
 	background: var(--color-background);
 	color: var(--color-foreground);
 	font-family: var(--frontend-agent-chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
