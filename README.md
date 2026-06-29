@@ -105,8 +105,8 @@ Every token below defaults to agenttic's current value, so a site that sets noth
 
 | Token | Purpose |
 |-------|---------|
-| `--frontend-agent-chat-accent` | Primary action color (FAB, links, focus ring) |
-| `--frontend-agent-chat-on-accent` | Foreground on accent fills |
+| `--frontend-agent-chat-accent` | Primary action color (FAB, composer send button, links, focus ring) |
+| `--frontend-agent-chat-on-accent` | Foreground on accent fills (including the composer send button) |
 | `--frontend-agent-chat-drawer-bg` | Drawer / conversation background |
 | `--frontend-agent-chat-text-primary` | Primary text |
 | `--frontend-agent-chat-text-muted` | Muted / secondary text |

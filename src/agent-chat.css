@@ -525,11 +525,20 @@
 }
 
 .frontend-agent-chat__body .agenttic-embedded__suggestions button,
-.frontend-agent-chat__body .agenttic-embedded__input button,
 .frontend-agent-chat__body .agenttic-embedded__input textarea {
 	border-color: var(--frontend-agent-chat-border-color, #e2e8f0);
 	background: var(--frontend-agent-chat-input-bg, #fff);
 	color: var(--color-foreground);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__input button {
+	border-color: transparent;
+	background: var(--frontend-agent-chat-accent, #2563eb);
+	color: var(--frontend-agent-chat-on-accent, #fff);
+}
+
+.frontend-agent-chat__body .agenttic-embedded__input button:hover:not(:disabled) {
+	filter: brightness(0.95);
 }
 
 .frontend-agent-chat__body .agenttic-embedded__input textarea:focus {
