@@ -517,6 +517,18 @@
 	color: inherit;
 }
 
+/* Constrain WordPress core emoji image replacements to inline text size. */
+.frontend-agent-chat__body .agenttic-embedded__bubble img.emoji {
+	display: inline;
+	width: 1em;
+	height: 1em;
+	margin: 0 0.05em 0 0.1em;
+	padding: 0;
+	border: 0;
+	box-shadow: none;
+	vertical-align: -0.1em;
+}
+
 .frontend-agent-chat__body .agenttic-embedded__thinking,
 .frontend-agent-chat__body .agenttic-embedded__error,
 .frontend-agent-chat__body .agenttic-embedded__empty,
