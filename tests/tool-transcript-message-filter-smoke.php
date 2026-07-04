@@ -35,11 +35,20 @@ $messages = frontend_agent_chat_session_messages(
 				'role'    => 'assistant',
 				'type'    => 'tool_call',
 				'content' => 'AI ACTION (Turn 1): Executing Data Lookup.',
+				'payload' => array(
+					'tool_name'  => 'lookup_data',
+					'parameters' => array( 'query' => 'status' ),
+				),
 			),
 			array(
 				'role'    => 'user',
 				'type'    => 'tool_result',
 				'content' => 'TOOL RESPONSE (Turn 1): SUCCESS.',
+				'payload' => array(
+					'tool_name' => 'lookup_data',
+					'success'   => true,
+					'result'    => array( 'count' => 2 ),
+				),
 			),
 			array(
 				'role'    => 'assistant',
@@ -51,17 +60,8 @@ $messages = frontend_agent_chat_session_messages(
 );
 
 frontend_agent_chat_tool_filter_assert(
-	array(
-		array(
-			'role'    => 'user',
-			'content' => 'What do you know?',
-		),
-		array(
-			'role'    => 'assistant',
-			'content' => 'Here is the answer.',
-		),
-	) === $messages,
-	'Frontend transcript output should omit typed tool call/result messages.'
+	count( $messages ) === 4 && 'lookup_data' === ( $messages[1]['metadata']['tool_name'] ?? '' ) && true === ( $messages[2]['metadata']['success'] ?? false ),
+	'Frontend transcript output should preserve renderable typed tool call/result messages.'
 );
 
-echo "Frontend tool transcript message filter smoke passed (1 assertion).\n";
+echo "Frontend tool transcript message projection smoke passed (1 assertion).\n";

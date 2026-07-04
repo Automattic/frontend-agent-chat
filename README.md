@@ -29,6 +29,7 @@ update_option( 'frontend_agent_chat_config', [
         'expand_button'    => true,
         'close_button'     => true,
     ],
+    'collapsible' => false,
 ] );
 ```
 
@@ -43,6 +44,7 @@ update_option( 'frontend_agent_chat_config', [
 | `header_controls.session_controls` | `bool` | Show new/session picker controls in the drawer header |
 | `header_controls.expand_button` | `bool` | Show the viewport expand/collapse button |
 | `header_controls.close_button` | `bool` | Show the drawer close button |
+| `collapsible` | `bool` | Enable the inline panel collapse/expand control for mounted layouts |
 
 The config can also be overridden via the `frontend_agent_chat_config` filter.
 

@@ -36,6 +36,7 @@ function frontend_agent_chat_get_config(): array {
 			'expand_button'    => true,
 			'close_button'     => true,
 		),
+		'collapsible'          => false,
 		'layout'               => 'floating',
 	);
 

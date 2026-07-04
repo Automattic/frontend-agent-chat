@@ -22,6 +22,7 @@ import {
 	createAgentsApiChatAdapter,
 	createPresentQuestionToolRenderers,
 	groupToolMessages,
+	normalizePresentQuestionPrompt,
 	useAgentsApiChat,
 	normalizeRunEvent,
 } from '@automattic/agenttic-client/agents-api';
@@ -93,6 +94,7 @@ interface AgentChatProps {
 	collapseIconPath?: string;
 	expandIconViewBox?: string;
 	layout?: 'floating' | 'inline';
+	collapsible?: boolean;
 	headerControls?: {
 		agentSelector?: boolean;
 		sessionControls?: boolean;
@@ -185,6 +187,15 @@ interface ArtifactStatusPayload {
 	diagnosticsCount?: number;
 	error?: string;
 	thumbnails: Array< { url: string; alt?: string } >;
+}
+
+interface ToolSummaryPayload {
+	title: string;
+	status?: string;
+	summary?: string;
+	detail?: string;
+	payload: Record< string, unknown >;
+	hasError: boolean;
 }
 
 function getToolPayload(
@@ -331,6 +342,80 @@ function messageText( message: AgentsApiMessage ): string {
 	}
 
 	return '';
+}
+
+function parseJsonObject( value: string ): Record< string, unknown > | null {
+	try {
+		const parsed = JSON.parse( value );
+		return parsed && typeof parsed === 'object' && ! Array.isArray( parsed )
+			? ( parsed as Record< string, unknown > )
+			: null;
+	} catch ( error ) {
+		return null;
+	}
+}
+
+function getQuestionPromptPayload( group: AgentsApiToolGroup ): unknown {
+	const payload = getToolPayload( group );
+	const candidates: unknown[] = [
+		group.result?.result,
+		group.call?.args,
+		payload,
+		asRecord( payload.payload ),
+		asRecord( payload.result ),
+	];
+
+	for ( const message of [ group.result?.message, group.call?.message ] ) {
+		if ( ! message ) {
+			continue;
+		}
+		candidates.push( message.raw, message.metadata );
+		const text = messageText( message );
+		if ( text ) {
+			const parsed = parseJsonObject( text );
+			if ( parsed ) {
+				candidates.push( parsed );
+			}
+		}
+	}
+
+	return candidates.find( ( candidate ) =>
+		Boolean( normalizePresentQuestionPrompt( candidate ) )
+	);
+}
+
+function getQuestionPromptPayloadFromMessage(
+	message: AgentsApiMessage
+): unknown {
+	const raw = message.raw ?? {};
+	const metadata = message.metadata ?? {};
+	const candidates: unknown[] = [
+		raw,
+		metadata,
+		asRecord( raw.payload ),
+		asRecord( metadata.payload ),
+		asRecord( raw.result ),
+		asRecord( metadata.result ),
+	];
+	const text = messageText( message );
+	if ( text ) {
+		const parsed = parseJsonObject( text );
+		if ( parsed ) {
+			candidates.push( parsed );
+		}
+	}
+
+	return candidates.find( ( candidate ) =>
+		Boolean( normalizePresentQuestionPrompt( candidate ) )
+	);
+}
+
+function isQuestionLikeTool( group: AgentsApiToolGroup ): boolean {
+	return (
+		group.name === 'present_question' ||
+		group.name === 'ask_question' ||
+		Boolean( normalizePresentQuestionPrompt( getQuestionPromptPayload( group ) ) )
+	);
 }
 
 function deriveAnsweredQuestions(
@@ -1224,6 +1309,66 @@ function renderArtifactStatusPayload(
 	);
 }
 
+function readToolSummaryPayload( group: AgentsApiToolGroup ): ToolSummaryPayload {
+	const payload = getToolPayload( group );
+	const status = firstStringValue( [ payload ], 'status' );
+	const error = firstStringValue( [ payload ], 'error' );
+	const summary = firstStringValue( [ payload ], 'summary' );
+	const detail = firstStringValue( [ payload ], 'message' ) ?? firstStringValue( [ payload ], 'detail' );
+	const title = firstStringValue( [ payload ], 'title' ) ?? group.name;
+	const hasError = Boolean( error ) || status === 'failed' || status === 'error' || payload.success === false;
+
+	return {
+		title,
+		status,
+		summary,
+		detail: error ?? detail,
+		payload,
+		hasError,
+	};
+}
+
+function renderToolSummaryPayload( group: AgentsApiToolGroup ): ReactNode {
+	const payload = readToolSummaryPayload( group );
+	const json = JSON.stringify( payload.payload, null, 2 );
+
+	return createElement(
+		'details',
+		{
+			className: `frontend-agent-chat__tool-card frontend-agent-chat__tool-summary${
+				payload.hasError ? ' has-error' : ''
+			}`,
+		},
+		createElement(
+			'summary',
+			{ className: 'frontend-agent-chat__tool-summary-header' },
+			createElement(
+				'span',
+				{ className: 'frontend-agent-chat__tool-card-title' },
+				payload.title
+			),
+			payload.status &&
+				createElement(
+					'span',
+					{ className: 'frontend-agent-chat__tool-summary-status' },
+					payload.status
+				)
+		),
+		( payload.summary || payload.detail ) &&
+			createElement(
+				'p',
+				{ className: 'frontend-agent-chat__tool-card-copy' },
+				payload.summary ?? payload.detail
+			),
+		json &&
+			createElement(
+				'pre',
+				{ className: 'frontend-agent-chat__tool-summary-json' },
+				json
+			)
+	);
+}
+
 function renderOperatorDiagnosticsPanel(
 	metadata: Record< string, unknown > | null
 ): ReactNode {
@@ -1355,6 +1500,7 @@ export default function AgentChat( {
 	collapseIconPath,
 	expandIconViewBox = '0 0 24 24',
 	layout = 'floating',
+	collapsible = false,
 	headerControls,
 	isLoggedIn = false,
 	loadingMessages = true,
@@ -1368,6 +1514,7 @@ export default function AgentChat( {
 	const isInline = layout === 'inline';
 	const [ isOpen, setIsOpen ] = useState( isInline );
 	const [ isExpanded, setIsExpanded ] = useState( false );
+	const [ isCollapsed, setIsCollapsed ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const [ loadingMessageIndex, setLoadingMessageIndex ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] =
@@ -1435,6 +1582,10 @@ export default function AgentChat( {
 	}, [ isInline ] );
 	const toggleExpanded = useCallback(
 		() => setIsExpanded( ( expanded ) => ! expanded ),
+		[]
+	);
+	const toggleCollapsed = useCallback(
+		() => setIsCollapsed( ( collapsed ) => ! collapsed ),
 		[]
 	);
 	const switchAgent = useCallback(
@@ -1550,6 +1701,12 @@ export default function AgentChat( {
 			setIsExpanded( false );
 		}
 	}, [ isInline ] );
+
+	useEffect( () => {
+		if ( ! collapsible ) {
+			setIsCollapsed( false );
+		}
+	}, [ collapsible ] );
 
 	useEffect( () => {
 		if ( isLoggedIn ) {
@@ -1839,11 +1996,7 @@ export default function AgentChat( {
 			const payload = parseArtifactStatusPayload( group );
 			return payload
 				? renderArtifactStatusPayload( payload )
-				: createElement(
-						'pre',
-						{ className: 'frontend-agent-chat__tool-card' },
-						JSON.stringify( getToolPayload( group ), null, 2 )
-				  );
+				: renderToolSummaryPayload( group );
 		};
 		const questionRenderers = createPresentQuestionToolRenderers( {
 			QuestionCard,
@@ -1866,6 +2019,7 @@ export default function AgentChat( {
 			artifact_status: artifactRenderer,
 			artifact_status_update: artifactRenderer,
 			artifact_task_status: artifactRenderer,
+			ask_question: questionRenderers.present_question,
 			...questionRenderers,
 		};
 	}, [
@@ -1888,11 +2042,56 @@ export default function AgentChat( {
 					! isToolCallReplacedByResult( group, toolResultIds )
 			);
 			if ( toolGroups.length === 0 ) {
+				const promptPayload = getQuestionPromptPayloadFromMessage( message );
+				if ( normalizePresentQuestionPrompt( promptPayload ) ) {
+					const ToolComponent = () =>
+						createElement(
+							'div',
+							{ className: 'frontend-agent-chat__question-stack' },
+							toolRenderers.present_question?.( {
+								id: message.id,
+								name: 'present_question',
+								result: {
+									id: message.id,
+									message,
+									result: asRecord( promptPayload ),
+								},
+							} )
+						);
+					return {
+						...message,
+						content: [
+							{
+								type: 'component' as const,
+								component: ToolComponent,
+							},
+						],
+					};
+				}
 				return message;
 			}
 
 			const renderedTools = toolGroups
 				.map( ( group ): ReactNode => {
+					if ( isQuestionLikeTool( group ) ) {
+						const promptPayload = getQuestionPromptPayload( group );
+						return toolRenderers.present_question?.( {
+							...group,
+							name: 'present_question',
+							result: group.result
+								? {
+										...group.result,
+										result: asRecord( promptPayload ),
+								  }
+								: group.result,
+							call: group.call
+								? {
+										...group.call,
+										args: asRecord( promptPayload ),
+								  }
+								: group.call,
+						} );
+					}
 					// Generic agents/ pending action → agenttic DiffCard. Keyed
 					// by shape, so any approval-gated ability renders here
 					// regardless of tool name.
@@ -1926,7 +2125,10 @@ export default function AgentChat( {
 								),
 						} );
 					}
-					return toolRenderers[ group.name ]?.( group ) ?? null;
+					return (
+						toolRenderers[ group.name ]?.( group ) ??
+						renderToolSummaryPayload( group )
+					);
 				} )
 				.filter( Boolean );
 
@@ -2089,6 +2291,10 @@ export default function AgentChat( {
 		!! activeAgentSlug;
 	const showExpandButton = headerControls?.expandButton !== false;
 	const showCloseButton = headerControls?.closeButton !== false;
+	const showCollapseButton = isInline && collapsible;
+	const collapsedButtonLabel = isCollapsed
+		? __( 'Expand chat panel', 'frontend-agent-chat' )
+		: __( 'Collapse chat panel', 'frontend-agent-chat' );
 	const expandedButtonLabel = isExpanded
 		? __( 'Exit expanded chat view', 'frontend-agent-chat' )
 		: __( 'Expand chat to viewport', 'frontend-agent-chat' );
@@ -2098,7 +2304,23 @@ export default function AgentChat( {
 
 	return createElement(
 		'div',
-		{ className: `frontend-agent-chat is-${ layout }` },
+		{
+			className: `frontend-agent-chat is-${ layout }${
+				isCollapsed ? ' is-collapsed' : ''
+			}`,
+		},
+		showCollapseButton &&
+			isCollapsed &&
+			createElement(
+				'button',
+				{
+					type: 'button',
+					className: 'frontend-agent-chat__collapsed-tab',
+					onClick: toggleCollapsed,
+					'aria-label': collapsedButtonLabel,
+				},
+				activeAgentName
+			),
 		! isInline &&
 			createElement(
 				'button',
@@ -2134,8 +2356,8 @@ export default function AgentChat( {
 					isOpen ? ' is-open' : ''
 				}${ isExpanded ? ' is-expanded' : '' }${
 					isInline ? ' is-inline' : ''
-				}`,
-				'aria-hidden': ! isOpen,
+				}${ isCollapsed ? ' is-collapsed' : '' }`,
+				'aria-hidden': ! isOpen || isCollapsed,
 			},
 			createElement(
 				'div',
@@ -2239,6 +2461,21 @@ export default function AgentChat( {
 										)
 									)
 								)
+						),
+					showCollapseButton &&
+						createElement(
+							'button',
+							{
+								type: 'button',
+								className: 'frontend-agent-chat__collapse-panel',
+								onClick: toggleCollapsed,
+								'aria-label': collapsedButtonLabel,
+								'aria-pressed': isCollapsed,
+							},
+							renderExpandIcon(
+								collapseIconPath || DEFAULT_COLLAPSE_ICON_PATH,
+								expandIconViewBox
+							)
 						),
 					showExpandButton &&
 						createElement(

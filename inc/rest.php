@@ -1021,7 +1021,7 @@ function frontend_agent_chat_session_messages( array $source ): array {
 			continue;
 		}
 
-		if ( in_array( (string) ( $message['type'] ?? '' ), array( 'tool_call', 'tool_result' ), true ) ) {
+		if ( in_array( (string) ( $message['type'] ?? '' ), array( 'tool_call', 'tool_result', 'input_required', 'approval_required' ), true ) ) {
 			$tool_message = frontend_agent_chat_tool_message( $message );
 			if ( null !== $tool_message ) {
 				$messages[] = $tool_message;
@@ -1264,15 +1264,18 @@ function frontend_agent_chat_first_string_value( array $source, array $keys ): s
  */
 function frontend_agent_chat_tool_message( array $message ): ?array {
 	$type = (string) ( $message['type'] ?? '' );
-	if ( ! in_array( $type, array( 'tool_call', 'tool_result' ), true ) ) {
+	if ( ! in_array( $type, array( 'tool_call', 'tool_result', 'input_required', 'approval_required' ), true ) ) {
 		return null;
 	}
 
 	$payload   = is_array( $message['payload'] ?? null ) ? $message['payload'] : array();
 	$metadata  = is_array( $message['metadata'] ?? null ) ? $message['metadata'] : array();
-	$tool_name = (string) ( $payload['tool_name'] ?? $metadata['tool_name'] ?? '' );
+	$tool_name = (string) ( $payload['tool_name'] ?? $metadata['tool_name'] ?? ( 'input_required' === $type ? 'present_question' : '' ) );
 	if ( '' === $tool_name ) {
-		return null;
+		if ( 'approval_required' !== $type ) {
+			return null;
+		}
+		$tool_name = 'approval_required';
 	}
 
 	$metadata = array_merge(
@@ -1291,7 +1294,7 @@ function frontend_agent_chat_tool_message( array $message ): ?array {
 	}
 
 	return array(
-		'role'     => 'tool_call' === $type ? 'assistant' : 'user',
+		'role'     => in_array( $type, array( 'tool_call', 'input_required', 'approval_required' ), true ) ? 'assistant' : 'user',
 		'content'  => frontend_agent_chat_flatten_message_content( $message['content'] ?? '' ),
 		'metadata' => $metadata,
 	);

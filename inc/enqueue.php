@@ -234,6 +234,7 @@ function frontend_agent_chat_enqueue() {
 		'collapseIconPath'           => frontend_agent_chat_sanitize_svg_path( $config['collapse_icon_path'] ?? '' ),
 		'expandIconViewBox'          => frontend_agent_chat_sanitize_svg_view_box( $config['expand_icon_view_box'] ?? '0 0 24 24' ),
 		'layout'                     => 'inline' === ( $config['layout'] ?? '' ) ? 'inline' : 'floating',
+		'collapsible'                => ! empty( $config['collapsible'] ),
 		'headerControls'             => frontend_agent_chat_sanitize_header_controls( $config['header_controls'] ?? array() ),
 		'isLoggedIn'                 => is_user_logged_in(),
 		'canUploadFiles'             => is_user_logged_in() && current_user_can( 'upload_files' ),

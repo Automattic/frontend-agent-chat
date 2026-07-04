@@ -44,6 +44,7 @@ declare global {
 			collapseIconPath?: string;
 			expandIconViewBox?: string;
 			layout?: 'floating' | 'inline';
+			collapsible?: boolean;
 			headerControls?: {
 				agentSelector?: boolean;
 				sessionControls?: boolean;
@@ -119,6 +120,7 @@ function init(): void {
 			collapseIconPath: config.collapseIconPath,
 			expandIconViewBox: config.expandIconViewBox,
 			layout: config.layout,
+			collapsible: config.collapsible ?? false,
 			headerControls: config.headerControls,
 			isLoggedIn: config.isLoggedIn ?? false,
 			loadingMessages: config.loadingMessages ?? true,
