@@ -64,6 +64,14 @@ import {
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 
+const isAbortError = ( error: unknown ): boolean => {
+	return (
+		!! error &&
+		typeof error === 'object' &&
+		( error as { name?: string } ).name === 'AbortError'
+	);
+};
+
 /**
  * Internal dependencies
  */
@@ -1731,8 +1739,21 @@ export default function AgentChat( {
 	}, [ bootstrapPath, isLoggedIn ] );
 
 	useEffect( () => {
-		apiFetch( { path: agentsPath } )
+		let cancelled = false;
+		const controller = new AbortController();
+		const cancel = () => {
+			cancelled = true;
+			controller.abort();
+		};
+
+		window.addEventListener( 'pagehide', cancel, { once: true } );
+
+		apiFetch( { path: agentsPath, signal: controller.signal } )
 			.then( ( response ) => {
+				if ( cancelled ) {
+					return;
+				}
+
 				const data = ( response as AgentsResponse ).data ?? {};
 				const nextAgents = data.agents ?? [];
 				if ( nextAgents.length === 0 ) {
@@ -1772,12 +1793,21 @@ export default function AgentChat( {
 				} );
 			} )
 			.catch( ( err: unknown ) => {
+				if ( cancelled || isAbortError( err ) ) {
+					return;
+				}
+
 				// eslint-disable-next-line no-console
 				console.error(
 					'AgentChat: failed to load accessible agents',
 					err
 				);
 			} );
+
+		return () => {
+			cancel();
+			window.removeEventListener( 'pagehide', cancel );
+		};
 	}, [ agentsPath ] );
 
 	useEffect( () => {
