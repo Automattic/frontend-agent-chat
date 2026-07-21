@@ -409,6 +409,34 @@ function frontend_agent_chat_rest_get_agent_slug( WP_REST_Request $request, stri
 }
 
 /**
+ * Filter a canonical Agents API ability input before principal enrichment.
+ *
+ * This shared seam lets a host apply stable scope such as a workspace to the
+ * complete session lifecycle without trusting equivalent browser parameters.
+ *
+ * @param string          $ability    Canonical ability name.
+ * @param array           $input      Canonical ability input.
+ * @param WP_REST_Request $request    REST request.
+ * @param string          $agent_slug Selected agent slug, when available.
+ * @return array Filtered input.
+ */
+function frontend_agent_chat_filter_ability_input( string $ability, array $input, WP_REST_Request $request, string $agent_slug = '' ): array {
+	/**
+	 * Filter a canonical Agents API input sent by the frontend chat widget.
+	 *
+	 * @param array           $input      Canonical ability input.
+	 * @param string          $ability    Canonical ability name.
+	 * @param WP_REST_Request $request    REST request.
+	 * @param string          $agent_slug Selected agent slug, when available.
+	 * @param array           $config     Frontend chat configuration.
+	 */
+	/** @var mixed $filtered */
+	$filtered = apply_filters( 'frontend_agent_chat_ability_input', $input, $ability, $request, $agent_slug, frontend_agent_chat_get_config() );
+
+	return is_array( $filtered ) ? $filtered : array();
+}
+
+/**
  * Send a message through the canonical Agents API chat ability.
  *
  * @param WP_REST_Request $request REST request.
@@ -451,7 +479,8 @@ function frontend_agent_chat_rest_send_message( WP_REST_Request $request ) {
 	/** @var mixed $chat_input */
 	$chat_input = apply_filters( 'frontend_agent_chat_chat_input', $chat_input, $request, $agent_slug, $config );
 
-	$chat_input = frontend_agent_chat_add_browser_principal_input( is_array( $chat_input ) ? $chat_input : array() );
+	$chat_input = frontend_agent_chat_filter_ability_input( 'agents/chat', is_array( $chat_input ) ? $chat_input : array(), $request, $agent_slug );
+	$chat_input = frontend_agent_chat_add_browser_principal_input( $chat_input );
 	$result     = frontend_agent_chat_execute_ability( 'agents/chat', $chat_input );
 
 	if ( is_wp_error( $result ) ) {
@@ -499,15 +528,16 @@ function frontend_agent_chat_rest_get_run( WP_REST_Request $request ) {
 		return new WP_Error( 'frontend_agent_chat_invalid_run', __( 'run_id and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$result = frontend_agent_chat_execute_ability(
+	$input  = frontend_agent_chat_filter_ability_input(
 		'agents/get-chat-run',
-		frontend_agent_chat_add_browser_principal_input(
-			array(
-				'run_id'     => $run_id,
-				'session_id' => $session_id,
-			)
-		)
+		array(
+			'run_id'     => $run_id,
+			'session_id' => $session_id,
+		),
+		$request,
+		frontend_agent_chat_rest_get_agent_slug( $request )
 	);
+	$result = frontend_agent_chat_execute_ability( 'agents/get-chat-run', frontend_agent_chat_add_browser_principal_input( $input ) );
 	if ( is_wp_error( $result ) ) {
 		return $result;
 	}
@@ -538,17 +568,18 @@ function frontend_agent_chat_rest_list_run_events( WP_REST_Request $request ) {
 		$limit = 100;
 	}
 
-	$result = frontend_agent_chat_execute_ability(
+	$input  = frontend_agent_chat_filter_ability_input(
 		'agents/list-chat-run-events',
-		frontend_agent_chat_add_browser_principal_input(
-			array(
-				'run_id'     => $run_id,
-				'session_id' => $session_id,
-				'cursor'     => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
-				'limit'      => max( 1, min( 1000, $limit ) ),
-			)
-		)
+		array(
+			'run_id'     => $run_id,
+			'session_id' => $session_id,
+			'cursor'     => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
+			'limit'      => max( 1, min( 1000, $limit ) ),
+		),
+		$request,
+		frontend_agent_chat_rest_get_agent_slug( $request )
 	);
+	$result = frontend_agent_chat_execute_ability( 'agents/list-chat-run-events', frontend_agent_chat_add_browser_principal_input( $input ) );
 	if ( is_wp_error( $result ) ) {
 		return $result;
 	}
@@ -574,15 +605,16 @@ function frontend_agent_chat_rest_cancel_run( WP_REST_Request $request ) {
 		return new WP_Error( 'frontend_agent_chat_invalid_run', __( 'run_id and session_id are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$result = frontend_agent_chat_execute_ability(
+	$input  = frontend_agent_chat_filter_ability_input(
 		'agents/cancel-chat-run',
-		frontend_agent_chat_add_browser_principal_input(
-			array(
-				'run_id'     => $run_id,
-				'session_id' => $session_id,
-			)
-		)
+		array(
+			'run_id'     => $run_id,
+			'session_id' => $session_id,
+		),
+		$request,
+		frontend_agent_chat_rest_get_agent_slug( $request )
 	);
+	$result = frontend_agent_chat_execute_ability( 'agents/cancel-chat-run', frontend_agent_chat_add_browser_principal_input( $input ) );
 	if ( is_wp_error( $result ) ) {
 		return $result;
 	}
@@ -639,7 +671,8 @@ function frontend_agent_chat_rest_queue_message( WP_REST_Request $request ) {
 	/** @var mixed $queue_input */
 	$queue_input = apply_filters( 'frontend_agent_chat_queue_input', $queue_input, $request, $agent_slug, $config );
 
-	$result = frontend_agent_chat_execute_ability( 'agents/queue-chat-message', frontend_agent_chat_add_browser_principal_input( is_array( $queue_input ) ? $queue_input : array() ) );
+	$queue_input = frontend_agent_chat_filter_ability_input( 'agents/queue-chat-message', is_array( $queue_input ) ? $queue_input : array(), $request, $agent_slug );
+	$result      = frontend_agent_chat_execute_ability( 'agents/queue-chat-message', frontend_agent_chat_add_browser_principal_input( $queue_input ) );
 	if ( is_wp_error( $result ) ) {
 		return $result;
 	}
@@ -696,14 +729,29 @@ function frontend_agent_chat_rest_resolve_pending_action( WP_REST_Request $reque
 		return new WP_Error( 'frontend_agent_chat_invalid_pending_action', __( 'action_id and decision are required.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$result = frontend_agent_chat_execute_ability(
-		'agents/resolve-pending-action',
-		frontend_agent_chat_add_browser_principal_input( array(
-			'action_id' => $action_id,
-			'decision'  => $decision,
-			'resolver'  => frontend_agent_chat_current_resolver_id(),
-		) )
+	$origin = $request->get_param( 'origin' );
+	$origin = is_array( $origin ) ? frontend_agent_chat_sanitize_client_context( $origin ) : array();
+	$input  = array(
+		'action_id' => $action_id,
+		'decision'  => $decision,
+		'resolver'  => frontend_agent_chat_current_resolver_id(),
 	);
+
+	/**
+	 * Filter pending-action resolver input using the client-returned origin as
+	 * an untrusted hint. Consumers must validate or replace it with server-owned
+	 * data before adding workspace or context to the canonical ability input.
+	 *
+	 * @param array           $input   Canonical agents/resolve-pending-action input.
+	 * @param WP_REST_Request $request REST request.
+	 * @param array           $origin  Untrusted canonical-origin projection returned by the client.
+	 * @param array           $config  Frontend chat configuration.
+	 */
+	/** @var mixed $input */
+	$input = apply_filters( 'frontend_agent_chat_pending_action_resolve_input', $input, $request, $origin, frontend_agent_chat_get_config() );
+	$input = frontend_agent_chat_filter_ability_input( 'agents/resolve-pending-action', is_array( $input ) ? $input : array(), $request );
+
+	$result = frontend_agent_chat_execute_ability( 'agents/resolve-pending-action', frontend_agent_chat_add_browser_principal_input( $input ) );
 
 	if ( is_wp_error( $result ) ) {
 		return $result;
@@ -751,10 +799,11 @@ function frontend_agent_chat_rest_list_sessions( WP_REST_Request $request ) {
 	 */
 	/** @var mixed $list_input */
 	$list_input = apply_filters( 'frontend_agent_chat_session_list_input', $list_input, $request, $agent_slug, $config );
+	$list_input = frontend_agent_chat_filter_ability_input( 'agents/list-conversation-sessions', is_array( $list_input ) ? $list_input : array(), $request, $agent_slug );
 
 	$result = frontend_agent_chat_execute_ability(
 		'agents/list-conversation-sessions',
-		frontend_agent_chat_add_browser_principal_input( is_array( $list_input ) ? $list_input : array() )
+		frontend_agent_chat_add_browser_principal_input( $list_input )
 	);
 
 	if ( is_wp_error( $result ) ) {
@@ -789,6 +838,7 @@ function frontend_agent_chat_rest_get_session( WP_REST_Request $request ) {
 	if ( '' !== $agent_slug ) {
 		$input['agent'] = $agent_slug;
 	}
+	$input  = frontend_agent_chat_filter_ability_input( 'agents/get-conversation-session', $input, $request, $agent_slug );
 	$result = frontend_agent_chat_execute_ability( 'agents/get-conversation-session', frontend_agent_chat_add_browser_principal_input( $input ) );
 	if ( is_wp_error( $result ) ) {
 		return $result;
@@ -821,6 +871,7 @@ function frontend_agent_chat_rest_delete_session( WP_REST_Request $request ) {
 	if ( '' !== $agent_slug ) {
 		$input['agent'] = $agent_slug;
 	}
+	$input  = frontend_agent_chat_filter_ability_input( 'agents/delete-conversation-session', $input, $request, $agent_slug );
 	$result = frontend_agent_chat_execute_ability( 'agents/delete-conversation-session', frontend_agent_chat_add_browser_principal_input( $input ) );
 	if ( is_wp_error( $result ) ) {
 		return $result;
@@ -838,18 +889,46 @@ function frontend_agent_chat_rest_delete_session( WP_REST_Request $request ) {
 }
 
 /**
- * Mark one session as read.
+ * Mark one session as read when the canonical capability is available.
  *
  * @param WP_REST_Request $request REST request.
- * @return WP_REST_Response
+ * @return WP_REST_Response|WP_Error
  */
-function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ): WP_REST_Response {
+function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ) {
+	$ability_name = 'agents/mark-conversation-session-read';
+	$session_id   = sanitize_text_field( (string) $request['session_id'] );
+	if ( ! wp_has_ability( $ability_name ) ) {
+		return rest_ensure_response(
+			array(
+				'success' => false,
+				'data'    => array(
+					'session_id'  => $session_id,
+					'persisted'   => false,
+					'unsupported' => true,
+					'dependency'  => 'https://github.com/Automattic/agents-api/issues/448',
+				),
+			)
+		);
+	}
+
+	$config     = frontend_agent_chat_get_config();
+	$agent_slug = frontend_agent_chat_rest_get_agent_slug( $request, frontend_agent_chat_get_default_agent_slug( $config ) );
+	$input      = frontend_agent_chat_filter_ability_input(
+		$ability_name,
+		array( 'session_id' => $session_id ),
+		$request,
+		$agent_slug
+	);
+	$result     = frontend_agent_chat_execute_ability( $ability_name, frontend_agent_chat_add_browser_principal_input( $input ) );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$result = is_array( $result ) ? $result : array();
 	return rest_ensure_response(
 		array(
-			'success' => true,
-			'data'    => array(
-				'session_id' => sanitize_text_field( (string) $request['session_id'] ),
-			),
+			'success' => (bool) ( $result['persisted'] ?? $result['success'] ?? false ),
+			'data'    => array_merge( array( 'session_id' => $session_id ), $result ),
 		)
 	);
 }
@@ -874,16 +953,17 @@ function frontend_agent_chat_rest_update_session_title( WP_REST_Request $request
 		return new WP_Error( 'frontend_agent_chat_empty_session_title', __( 'Session title cannot be empty.', 'frontend-agent-chat' ), array( 'status' => 400 ) );
 	}
 
-	$result = frontend_agent_chat_execute_ability(
+	$input  = frontend_agent_chat_filter_ability_input(
 		'agents/update-conversation-session-title',
-		frontend_agent_chat_add_browser_principal_input(
-			array(
-				'agent'      => $agent_slug,
-				'session_id' => $session_id,
-				'title'      => $title,
-			)
-		)
+		array(
+			'agent'      => $agent_slug,
+			'session_id' => $session_id,
+			'title'      => $title,
+		),
+		$request,
+		$agent_slug
 	);
+	$result = frontend_agent_chat_execute_ability( 'agents/update-conversation-session-title', frontend_agent_chat_add_browser_principal_input( $input ) );
 
 	if ( is_wp_error( $result ) ) {
 		return $result;
