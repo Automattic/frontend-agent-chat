@@ -889,18 +889,46 @@ function frontend_agent_chat_rest_delete_session( WP_REST_Request $request ) {
 }
 
 /**
- * Mark one session as read.
+ * Mark one session as read when the canonical capability is available.
  *
  * @param WP_REST_Request $request REST request.
- * @return WP_REST_Response
+ * @return WP_REST_Response|WP_Error
  */
-function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ): WP_REST_Response {
+function frontend_agent_chat_rest_mark_session_read( WP_REST_Request $request ) {
+	$ability_name = 'agents/mark-conversation-session-read';
+	$session_id   = sanitize_text_field( (string) $request['session_id'] );
+	if ( ! wp_has_ability( $ability_name ) ) {
+		return rest_ensure_response(
+			array(
+				'success' => false,
+				'data'    => array(
+					'session_id'  => $session_id,
+					'persisted'   => false,
+					'unsupported' => true,
+					'dependency'  => 'https://github.com/Automattic/agents-api/issues/448',
+				),
+			)
+		);
+	}
+
+	$config     = frontend_agent_chat_get_config();
+	$agent_slug = frontend_agent_chat_rest_get_agent_slug( $request, frontend_agent_chat_get_default_agent_slug( $config ) );
+	$input      = frontend_agent_chat_filter_ability_input(
+		$ability_name,
+		array( 'session_id' => $session_id ),
+		$request,
+		$agent_slug
+	);
+	$result     = frontend_agent_chat_execute_ability( $ability_name, frontend_agent_chat_add_browser_principal_input( $input ) );
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	$result = is_array( $result ) ? $result : array();
 	return rest_ensure_response(
 		array(
-			'success' => true,
-			'data'    => array(
-				'session_id' => sanitize_text_field( (string) $request['session_id'] ),
-			),
+			'success' => (bool) ( $result['persisted'] ?? $result['success'] ?? false ),
+			'data'    => array_merge( array( 'session_id' => $session_id ), $result ),
 		)
 	);
 }
