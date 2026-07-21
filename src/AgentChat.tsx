@@ -244,6 +244,8 @@ interface GenericPendingAction {
 	 * is a plain string. The card never decodes a product-specific object shape.
 	 */
 	preview?: unknown;
+	/** Canonical server-issued routing fields, kept opaque by this client. */
+	origin?: Record< string, unknown >;
 }
 
 /**
@@ -312,6 +314,17 @@ function readGenericPendingAction(
 		}
 		const summary = firstStringValue( [ container, payload ], 'summary' );
 		const kind = firstStringValue( [ container, payload ], 'kind' );
+		const origin: Record< string, unknown > = {};
+		for ( const key of [ 'workspace', 'context', 'metadata' ] ) {
+			const value = container[ key ] ?? payload[ key ];
+			if (
+				value &&
+				typeof value === 'object' &&
+				! Array.isArray( value )
+			) {
+				origin[ key ] = value;
+			}
+		}
 		return {
 			action_id: actionId,
 			summary,
@@ -321,6 +334,7 @@ function readGenericPendingAction(
 				container.preview !== undefined
 					? container.preview
 					: payload.preview,
+			origin: Object.keys( origin ).length > 0 ? origin : undefined,
 		};
 	}
 
@@ -422,7 +436,9 @@ function isQuestionLikeTool( group: AgentsApiToolGroup ): boolean {
 	return (
 		group.name === 'present_question' ||
 		group.name === 'ask_question' ||
-		Boolean( normalizePresentQuestionPrompt( getQuestionPromptPayload( group ) ) )
+		Boolean(
+			normalizePresentQuestionPrompt( getQuestionPromptPayload( group ) )
+		)
 	);
 }
 
@@ -663,15 +679,17 @@ function dispatchActionResolved( detail: ActionResolvedDetail ): void {
  *
  * @param actionId Pending action ID.
  * @param decision Resolution decision.
+ * @param origin   Canonical origin fields returned for server validation.
  */
 function resolvePendingAction(
 	actionId: string,
-	decision: 'accepted' | 'rejected'
+	decision: 'accepted' | 'rejected',
+	origin?: Record< string, unknown >
 ): void {
 	apiFetch( {
 		path: '/frontend-agent-chat/v1/chat/actions/resolve',
 		method: 'POST',
-		data: { action_id: actionId, decision },
+		data: { action_id: actionId, decision, origin },
 	} )
 		.then( ( response: unknown ) => {
 			const data =
@@ -1317,14 +1335,22 @@ function renderArtifactStatusPayload(
 	);
 }
 
-function readToolSummaryPayload( group: AgentsApiToolGroup ): ToolSummaryPayload {
+function readToolSummaryPayload(
+	group: AgentsApiToolGroup
+): ToolSummaryPayload {
 	const payload = getToolPayload( group );
 	const status = firstStringValue( [ payload ], 'status' );
 	const error = firstStringValue( [ payload ], 'error' );
 	const summary = firstStringValue( [ payload ], 'summary' );
-	const detail = firstStringValue( [ payload ], 'message' ) ?? firstStringValue( [ payload ], 'detail' );
+	const detail =
+		firstStringValue( [ payload ], 'message' ) ??
+		firstStringValue( [ payload ], 'detail' );
 	const title = firstStringValue( [ payload ], 'title' ) ?? group.name;
-	const hasError = Boolean( error ) || status === 'failed' || status === 'error' || payload.success === false;
+	const hasError =
+		Boolean( error ) ||
+		status === 'failed' ||
+		status === 'error' ||
+		payload.success === false;
 
 	return {
 		title,
@@ -2072,12 +2098,16 @@ export default function AgentChat( {
 					! isToolCallReplacedByResult( group, toolResultIds )
 			);
 			if ( toolGroups.length === 0 ) {
-				const promptPayload = getQuestionPromptPayloadFromMessage( message );
+				const promptPayload =
+					getQuestionPromptPayloadFromMessage( message );
 				if ( normalizePresentQuestionPrompt( promptPayload ) ) {
 					const ToolComponent = () =>
 						createElement(
 							'div',
-							{ className: 'frontend-agent-chat__question-stack' },
+							{
+								className:
+									'frontend-agent-chat__question-stack',
+							},
 							toolRenderers.present_question?.( {
 								id: message.id,
 								name: 'present_question',
@@ -2151,7 +2181,8 @@ export default function AgentChat( {
 							onResolve: ( decision: DiffDecision ) =>
 								resolvePendingAction(
 									pending.action_id,
-									decision
+									decision,
+									pending.origin
 								),
 						} );
 					}
@@ -2497,7 +2528,8 @@ export default function AgentChat( {
 							'button',
 							{
 								type: 'button',
-								className: 'frontend-agent-chat__collapse-panel',
+								className:
+									'frontend-agent-chat__collapse-panel',
 								onClick: toggleCollapsed,
 								'aria-label': collapsedButtonLabel,
 								'aria-pressed': isCollapsed,
