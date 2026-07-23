@@ -326,6 +326,7 @@ frontend_agent_chat_workspace_assert( 'queued-1' === ( $queued['data']['queued_m
 $listed = frontend_agent_chat_rest_list_sessions( new WP_REST_Request( array( 'agent' => 'demo-agent' ) ) );
 frontend_agent_chat_workspace_assert( 1 === ( $listed['data']['total'] ?? 0 ), 'List leaked a session from another workspace', $failures, $passes );
 frontend_agent_chat_workspace_assert( 'session-1' === ( $listed['data']['sessions'][0]['session_id'] ?? '' ), 'List did not return the workspace-owned session', $failures, $passes );
+frontend_agent_chat_workspace_assert( 'session-1' === ( $listed['data']['sessions'][0]['id'] ?? '' ), 'List did not project the canonical session ID for Agenttic', $failures, $passes );
 
 $loaded = frontend_agent_chat_rest_get_session( new WP_REST_Request( array( 'agent' => 'demo-agent', 'session_id' => 'session-1' ) ) );
 frontend_agent_chat_workspace_assert( 'session-1' === ( $loaded['data']['session_id'] ?? '' ), 'Get did not load the workspace-owned session', $failures, $passes );

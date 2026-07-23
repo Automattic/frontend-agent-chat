@@ -1425,11 +1425,13 @@ function frontend_agent_chat_session_summary( array $session ): array {
 	$messages     = frontend_agent_chat_session_messages( $session );
 	$stored_title = trim( (string) ( $session['title'] ?? '' ) );
 	$metadata     = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
+	$session_id   = frontend_agent_chat_extract_session_id( $session );
 
 	$metadata['has_stored_title'] = '' !== $stored_title;
 	$metadata['stored_title']     = $stored_title;
 	return array(
-		'session_id'    => frontend_agent_chat_extract_session_id( $session ),
+		'id'            => $session_id,
+		'session_id'    => $session_id,
 		'title'         => '' !== $stored_title ? $stored_title : frontend_agent_chat_title_from_messages( $messages ),
 		'context'       => (string) ( $session['context'] ?? 'frontend-agent-chat' ),
 		'first_message' => frontend_agent_chat_first_user_message( $messages ),
