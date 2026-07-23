@@ -645,5 +645,13 @@ function frontend_agent_chat_execute_ability( string $name, array $input ) {
 	}
 
 	$result = $ability->execute( $input );
+	if ( is_wp_error( $result ) && 'ability_invalid_permissions' === $result->get_error_code() ) {
+		$data = $result->get_error_data();
+		$data = is_array( $data ) ? $data : array();
+		if ( ! isset( $data['status'] ) ) {
+			$data['status'] = 403;
+			$result->add_data( $data );
+		}
+	}
 	return is_wp_error( $result ) ? $result : $result;
 }
