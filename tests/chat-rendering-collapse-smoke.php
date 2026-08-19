@@ -21,7 +21,5 @@ $assert( str_contains( $source, 'collapsible?: boolean' ) && str_contains( $enqu
 $assert( str_contains( $source, 'getQuestionPromptPayloadFromMessage' ) && str_contains( $source, 'normalizePresentQuestionPrompt' ), 'question-shaped messages render through QuestionCard' );
 $assert( str_contains( $source, 'renderToolSummaryPayload' ) && str_contains( $css, 'frontend-agent-chat__tool-summary-json' ), 'object tool results render as structured summaries' );
 $assert( str_contains( $css, '.frontend-agent-chat.is-inline.is-collapsed' ) && str_contains( $css, '.frontend-agent-chat__collapsed-tab' ), 'inline chat has collapsed styles' );
-$assert( str_contains( $source, 'const newChatSession = chat.newSession;' ) && str_contains( $source, 'newChatSession();' ), 'widget startup begins with a blank chat session' );
-$assert( ! str_contains( $source, 'getMostRecentSession' ) && ! str_contains( $source, 'latestSession' ), 'widget startup does not automatically restore stored history' );
 
-echo "Frontend chat rendering/collapse smoke passed (7 assertions).\n";
+echo "Frontend chat rendering/collapse smoke passed (5 assertions).\n";

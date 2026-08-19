@@ -877,6 +877,42 @@ function getSessionLabel(
 	);
 }
 
+function getMostRecentSession(
+	sessions: AgentsApiSession[]
+): AgentsApiSession | undefined {
+	return sessions.reduce< AgentsApiSession | undefined >(
+		( latest, session ) => {
+			if ( ! latest ) {
+				return session;
+			}
+
+			const sessionTime = Date.parse(
+				session.updatedAt ||
+					session.updated_at ||
+					session.createdAt ||
+					session.created_at ||
+					''
+			);
+			if ( Number.isNaN( sessionTime ) ) {
+				return latest;
+			}
+
+			const latestTime = Date.parse(
+				latest.updatedAt ||
+					latest.updated_at ||
+					latest.createdAt ||
+					latest.created_at ||
+					''
+			);
+
+			return Number.isNaN( latestTime ) || sessionTime > latestTime
+				? session
+				: latest;
+		},
+		undefined
+	);
+}
+
 function getMessageText( message: AgentsApiMessage ): string {
 	return message.content
 		.filter(
@@ -1976,8 +2012,21 @@ export default function AgentChat( {
 		() => deriveAnsweredQuestions( chat.messages ),
 		[ chat.messages ]
 	);
+	const sessionBootstrapRef = useRef< {
+		agentSlug: string;
+		waitingForSessions: AgentsApiSession[] | null;
+		bootstrapped: boolean;
+	} >( {
+		agentSlug: '',
+		waitingForSessions: null,
+		bootstrapped: false,
+	} );
+	const currentSessionsRef = useRef< AgentsApiSession[] >( chat.sessions );
 	const titleUpdateInFlightRef = useRef< Set< string > >( new Set() );
 	const titledSessionIdsRef = useRef< Set< string > >( new Set() );
+	useEffect( () => {
+		currentSessionsRef.current = chat.sessions;
+	}, [ chat.sessions ] );
 	useEffect( () => {
 		setAnsweredQuestions( {} );
 	}, [ chat.sessionId ] );
@@ -2172,9 +2221,52 @@ export default function AgentChat( {
 	);
 	const newChatSession = chat.newSession;
 	useEffect( () => {
+		sessionBootstrapRef.current = {
+			agentSlug: activeAgentSlug,
+			waitingForSessions: isLoggedIn ? currentSessionsRef.current : null,
+			bootstrapped: ! isLoggedIn,
+		};
 		newChatSession();
 		setUnreadCount( 0 );
 	}, [ activeAgentSlug, isLoggedIn, newChatSession ] );
+	useEffect( () => {
+		const bootstrap = sessionBootstrapRef.current;
+		if (
+			! isLoggedIn ||
+			! chatStorageReady ||
+			! activeAgentSlug ||
+			bootstrap.agentSlug !== activeAgentSlug ||
+			bootstrap.bootstrapped
+		) {
+			return;
+		}
+
+		if ( chat.sessionId ) {
+			bootstrap.bootstrapped = true;
+			return;
+		}
+
+		if ( bootstrap.waitingForSessions === chat.sessions ) {
+			return;
+		}
+
+		const latestSession = getMostRecentSession( chat.sessions );
+		bootstrap.bootstrapped = true;
+		if ( latestSession?.id ) {
+			chat.loadSession( latestSession.id );
+		}
+		// Depend on the granular chat.* fields this effect reads, not the whole
+		// `chat` object: re-running on every chat mutation would re-trigger
+		// session bootstrap and clobber the one-shot bootstrap guard.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		activeAgentSlug,
+		chat.sessions,
+		chat.sessionId,
+		chat.loadSession,
+		chatStorageReady,
+		isLoggedIn,
+	] );
 	useEffect( () => {
 		if (
 			! activeAgentSlug ||
