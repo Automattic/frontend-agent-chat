@@ -46,6 +46,20 @@ add_filter(
 			);
 		}
 
+		if ( '/frontend-agent-chat/v1/chat' === $route && 'POST' === $request->get_method() ) {
+			usleep( 1500000 );
+			return rest_ensure_response(
+				array(
+					'success' => true,
+					'data'    => array(
+						'session_id' => 'late-send-session',
+						'response'   => 'Late fixture reply',
+						'metadata'   => array(),
+					),
+				)
+			);
+		}
+
 		if ( '/frontend-agent-chat/v1/chat/restored-session' === $route ) {
 			usleep( 1500000 );
 			return rest_ensure_response(

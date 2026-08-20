@@ -1942,6 +1942,7 @@ export default function AgentChat( {
 	);
 	const chat = useAgentsApiChat( {
 		adapter: chatAdapter,
+		scopeKey: activeAgentSlug,
 		mediaUploadFn: canUploadFiles ? wpMediaUpload : undefined,
 		runAdapter,
 		getRunId,
@@ -2248,11 +2249,7 @@ export default function AgentChat( {
 			return;
 		}
 
-		if ( ! chat.hasLoadedSessions || chat.isLoadingSessions ) {
-			if ( ! chat.isLoadingSessions && chat.error ) {
-				bootstrap.bootstrapped = true;
-				setIsRestoringLatestSession( false );
-			}
+		if ( ! chat.hasResolvedSessions || chat.isLoadingSessions ) {
 			return;
 		}
 
@@ -2276,8 +2273,7 @@ export default function AgentChat( {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		activeAgentSlug,
-		chat.error,
-		chat.hasLoadedSessions,
+		chat.hasResolvedSessions,
 		chat.isLoadingSessions,
 		chat.sessions,
 		chat.sessionId,
@@ -2616,7 +2612,7 @@ export default function AgentChat( {
 					),
 				renderChatHeader(),
 				activeAgentSlug &&
-					( isRestoringLatestSession || chat.isLoadingSession ) &&
+					( isRestoringLatestSession || chat.isLoadingTranscript ) &&
 					createElement(
 						'div',
 						{
@@ -2631,7 +2627,7 @@ export default function AgentChat( {
 					),
 				activeAgentSlug &&
 					! isRestoringLatestSession &&
-					! chat.isLoadingSession &&
+					! chat.isLoadingTranscript &&
 					createElement(
 						AgentUI.Container,
 						{
