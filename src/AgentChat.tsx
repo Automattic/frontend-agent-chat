@@ -1551,6 +1551,8 @@ export default function AgentChat( {
 	const [ isCollapsed, setIsCollapsed ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
 	const [ loadingMessageIndex, setLoadingMessageIndex ] = useState( 0 );
+	const [ isRestoringLatestSession, setIsRestoringLatestSession ] =
+		useState( isLoggedIn );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] =
 		useState( isLoggedIn );
 	const [ browserBootstrapFailed, setBrowserBootstrapFailed ] =
@@ -1940,6 +1942,7 @@ export default function AgentChat( {
 	);
 	const chat = useAgentsApiChat( {
 		adapter: chatAdapter,
+		scopeKey: activeAgentSlug,
 		mediaUploadFn: canUploadFiles ? wpMediaUpload : undefined,
 		runAdapter,
 		getRunId,
@@ -2014,19 +2017,13 @@ export default function AgentChat( {
 	);
 	const sessionBootstrapRef = useRef< {
 		agentSlug: string;
-		waitingForSessions: AgentsApiSession[] | null;
 		bootstrapped: boolean;
 	} >( {
 		agentSlug: '',
-		waitingForSessions: null,
 		bootstrapped: false,
 	} );
-	const currentSessionsRef = useRef< AgentsApiSession[] >( chat.sessions );
 	const titleUpdateInFlightRef = useRef< Set< string > >( new Set() );
 	const titledSessionIdsRef = useRef< Set< string > >( new Set() );
-	useEffect( () => {
-		currentSessionsRef.current = chat.sessions;
-	}, [ chat.sessions ] );
 	useEffect( () => {
 		setAnsweredQuestions( {} );
 	}, [ chat.sessionId ] );
@@ -2220,12 +2217,17 @@ export default function AgentChat( {
 		[ canUploadFiles, chat ]
 	);
 	const newChatSession = chat.newSession;
+	const startNewChatSession = useCallback( () => {
+		sessionBootstrapRef.current.bootstrapped = true;
+		setIsRestoringLatestSession( false );
+		newChatSession();
+	}, [ newChatSession ] );
 	useEffect( () => {
 		sessionBootstrapRef.current = {
 			agentSlug: activeAgentSlug,
-			waitingForSessions: isLoggedIn ? currentSessionsRef.current : null,
 			bootstrapped: ! isLoggedIn,
 		};
+		setIsRestoringLatestSession( isLoggedIn );
 		newChatSession();
 		setUnreadCount( 0 );
 	}, [ activeAgentSlug, isLoggedIn, newChatSession ] );
@@ -2243,17 +2245,27 @@ export default function AgentChat( {
 
 		if ( chat.sessionId ) {
 			bootstrap.bootstrapped = true;
+			setIsRestoringLatestSession( false );
 			return;
 		}
 
-		if ( bootstrap.waitingForSessions === chat.sessions ) {
+		if ( ! chat.hasResolvedSessions || chat.isLoadingSessions ) {
 			return;
 		}
 
 		const latestSession = getMostRecentSession( chat.sessions );
 		bootstrap.bootstrapped = true;
 		if ( latestSession?.id ) {
-			chat.loadSession( latestSession.id );
+			const requestedAgentSlug = activeAgentSlug;
+			chat.loadSession( latestSession.id ).finally( () => {
+				if (
+					sessionBootstrapRef.current.agentSlug === requestedAgentSlug
+				) {
+					setIsRestoringLatestSession( false );
+				}
+			} );
+		} else {
+			setIsRestoringLatestSession( false );
 		}
 		// Depend on the granular chat.* fields this effect reads, not the whole
 		// `chat` object: re-running on every chat mutation would re-trigger
@@ -2261,6 +2273,8 @@ export default function AgentChat( {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		activeAgentSlug,
+		chat.hasResolvedSessions,
+		chat.isLoadingSessions,
 		chat.sessions,
 		chat.sessionId,
 		chat.loadSession,
@@ -2474,7 +2488,7 @@ export default function AgentChat( {
 									type: 'button',
 									className:
 										'frontend-agent-chat__session-new',
-									onClick: chat.newSession,
+									onClick: startNewChatSession,
 								},
 								__( 'New', 'frontend-agent-chat' )
 							),
@@ -2495,7 +2509,7 @@ export default function AgentChat( {
 													nextSessionId
 												);
 											} else {
-												chat.newSession();
+												startNewChatSession();
 											}
 										},
 										'aria-label': __(
@@ -2598,6 +2612,22 @@ export default function AgentChat( {
 					),
 				renderChatHeader(),
 				activeAgentSlug &&
+					( isRestoringLatestSession || chat.isLoadingTranscript ) &&
+					createElement(
+						'div',
+						{
+							className: 'frontend-agent-chat__session-loading',
+							role: 'status',
+							'aria-live': 'polite',
+						},
+						__(
+							'Loading previous conversation…',
+							'frontend-agent-chat'
+						)
+					),
+				activeAgentSlug &&
+					! isRestoringLatestSession &&
+					! chat.isLoadingTranscript &&
 					createElement(
 						AgentUI.Container,
 						{

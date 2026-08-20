@@ -1,0 +1,89 @@
+{
+  "schema": "wp-codebox/fuzz-suite/v1",
+  "id": "fac-session-hydration",
+  "version": "1",
+  "metadata": {
+    "runtime_requirements": {
+      "extra_plugins": [
+        {
+          "slug": "frontend-agent-chat",
+          "source": "__REPO_ROOT__",
+          "path": "__REPO_ROOT__",
+          "loadAs": "plugin",
+          "activate": true
+        },
+        {
+          "slug": "session-hydration-fixture",
+          "source": "__REPO_ROOT__/tests/fixtures/session-hydration-fixture",
+          "path": "__REPO_ROOT__/tests/fixtures/session-hydration-fixture",
+          "loadAs": "plugin",
+          "activate": true
+        }
+      ]
+    }
+  },
+  "target": {
+    "kind": "runtime",
+    "id": "wordpress.browser-actions",
+    "entrypoint": "wordpress.browser-actions"
+  },
+  "cases": [
+    {
+      "id": "restore-is-explicit-and-does-not-send",
+      "description": "A delayed latest-session restore replaces the composer with an explicit loading state and performs no chat send.",
+      "input": {
+        "args": [
+          "url=/",
+          "auth=wordpress-admin",
+          "auth-user-id=1",
+          "step-timeout=10s",
+          "timeout=15s",
+          "capture=steps,network,screenshot",
+          "steps-json=[{\"kind\":\"evaluate\",\"expression\":\"globalThis.__facRequests=[];const original=globalThis.fetch.bind(globalThis);globalThis.fetch=(input,init={})=>{globalThis.__facRequests.push({url:typeof input==='string'?input:input.url,method:init.method||input.method||'GET'});return original(input,init)};return true\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__fab\"},{\"kind\":\"evaluate\",\"expression\":\"({loading:document.querySelector('.frontend-agent-chat__session-loading')?.textContent.trim(),composer:!!document.querySelector('textarea')})\",\"assert\":{\"loading\":\"Loading previous conversation…\",\"composer\":false}},{\"kind\":\"expect\",\"selector\":\"[data-role=user]\",\"state\":\"visible\",\"timeout\":\"10s\"},{\"kind\":\"evaluate\",\"expression\":\"({history:[...document.querySelectorAll('[data-role=user]')].some(node=>node.textContent.includes('Historical fixture message')),loading:!!document.querySelector('.frontend-agent-chat__session-loading'),composer:!!document.querySelector('textarea'),sendPosts:globalThis.__facRequests.filter(request=>request.method==='POST'&&new URL(request.url,location.href).pathname.endsWith('/frontend-agent-chat/v1/chat')).length})\",\"assert\":{\"history\":true,\"loading\":false,\"composer\":true,\"sendPosts\":0}}]"
+        ]
+      }
+    },
+    {
+      "id": "new-wins-over-late-restore",
+      "description": "Choosing New during delayed hydration remains blank after the stale transcript response resolves.",
+      "input": {
+        "args": [
+          "url=/",
+          "auth=wordpress-admin",
+          "auth-user-id=1",
+          "timeout=15s",
+          "capture=steps,network,screenshot",
+          "steps-json=[{\"kind\":\"evaluate\",\"expression\":\"globalThis.__facRequests=[];const original=globalThis.fetch.bind(globalThis);globalThis.fetch=(input,init={})=>{globalThis.__facRequests.push({url:typeof input==='string'?input:input.url,method:init.method||input.method||'GET'});return original(input,init)};return true\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__fab\"},{\"kind\":\"expect\",\"selector\":\".frontend-agent-chat__session-loading\",\"state\":\"visible\",\"timeout\":\"4s\"},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__session-new\"},{\"kind\":\"evaluate\",\"expression\":\"await new Promise(resolve=>setTimeout(()=>resolve({history:[...document.querySelectorAll('[data-role=user]')].some(node=>node.textContent.includes('Historical fixture message')),loading:!!document.querySelector('.frontend-agent-chat__session-loading'),composer:!!document.querySelector('textarea'),sendPosts:globalThis.__facRequests.filter(request=>request.method==='POST'&&new URL(request.url,location.href).pathname.endsWith('/frontend-agent-chat/v1/chat')).length}),2500))\",\"assert\":{\"history\":false,\"loading\":false,\"composer\":true,\"sendPosts\":0}}]"
+        ]
+      }
+    },
+    {
+      "id": "new-wins-over-late-send",
+      "description": "Choosing New while a send is in flight remains blank after the stale send response resolves.",
+      "input": {
+        "args": [
+          "url=/",
+          "auth=wordpress-admin",
+          "auth-user-id=1",
+          "timeout=20s",
+          "capture=steps,network,screenshot",
+          "steps-json=[{\"kind\":\"evaluate\",\"expression\":\"globalThis.__facRequests=[];const original=globalThis.fetch.bind(globalThis);globalThis.fetch=(input,init={})=>{globalThis.__facRequests.push({url:typeof input==='string'?input:input.url,method:init.method||input.method||'GET'});return original(input,init)};return true\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__fab\"},{\"kind\":\"expect\",\"selector\":\"textarea\",\"state\":\"visible\",\"timeout\":\"10s\"},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__session-new\"},{\"kind\":\"fill\",\"selector\":\"textarea\",\"value\":\"Message before New\"},{\"kind\":\"press\",\"selector\":\"textarea\",\"key\":\"Enter\"},{\"kind\":\"expect\",\"selector\":\"button[aria-label='Stop processing']\",\"state\":\"visible\",\"timeout\":\"2s\"},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__session-new\"},{\"kind\":\"evaluate\",\"expression\":\"await new Promise(resolve=>setTimeout(()=>resolve({messages:[...document.querySelectorAll('[data-role]')].map(node=>node.textContent),composer:!!document.querySelector('textarea'),sendPosts:globalThis.__facRequests.filter(request=>request.method==='POST'&&new URL(request.url,location.href).pathname.endsWith('/frontend-agent-chat/v1/chat')).length}),2500))\",\"assert\":{\"messages\":[],\"composer\":true,\"sendPosts\":1}}]"
+        ]
+      }
+    },
+    {
+      "id": "transcript-wins-over-late-send",
+      "description": "Selecting a stored transcript while a send is in flight is not overwritten by the stale send response.",
+      "input": {
+        "args": [
+          "url=/",
+          "auth=wordpress-admin",
+          "auth-user-id=1",
+          "timeout=20s",
+          "capture=steps,network,screenshot",
+          "steps-json=[{\"kind\":\"evaluate\",\"expression\":\"globalThis.__facRequests=[];const original=globalThis.fetch.bind(globalThis);globalThis.fetch=(input,init={})=>{globalThis.__facRequests.push({url:typeof input==='string'?input:input.url,method:init.method||input.method||'GET'});return original(input,init)};return true\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__fab\"},{\"kind\":\"expect\",\"selector\":\"textarea\",\"state\":\"visible\",\"timeout\":\"10s\"},{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__session-new\"},{\"kind\":\"fill\",\"selector\":\"textarea\",\"value\":\"Message before transcript\"},{\"kind\":\"press\",\"selector\":\"textarea\",\"key\":\"Enter\"},{\"kind\":\"select\",\"selector\":\".frontend-agent-chat__session-select\",\"value\":\"restored-session\"},{\"kind\":\"expect\",\"selector\":\".frontend-agent-chat__session-loading\",\"state\":\"visible\",\"timeout\":\"2s\"},{\"kind\":\"expect\",\"selector\":\"textarea\",\"state\":\"visible\",\"timeout\":\"10s\"},{\"kind\":\"evaluate\",\"expression\":\"({history:[...document.querySelectorAll('[data-role=user]')].some(node=>node.textContent.includes('Historical fixture message')),lateReply:document.body.textContent.includes('Late fixture reply'),selected:document.querySelector('.frontend-agent-chat__session-select')?.value,composer:!!document.querySelector('textarea'),sendPosts:globalThis.__facRequests.filter(request=>request.method==='POST'&&new URL(request.url,location.href).pathname.endsWith('/frontend-agent-chat/v1/chat')).length})\",\"assert\":{\"history\":true,\"lateReply\":false,\"selected\":\"restored-session\",\"composer\":true,\"sendPosts\":1}}]"
+        ]
+      }
+    }
+  ]
+}
