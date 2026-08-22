@@ -1550,6 +1550,8 @@ export default function AgentChat( {
 	const [ isExpanded, setIsExpanded ] = useState( false );
 	const [ isCollapsed, setIsCollapsed ] = useState( false );
 	const [ unreadCount, setUnreadCount ] = useState( 0 );
+	const [ isSessionBootstrapping, setIsSessionBootstrapping ] =
+		useState( isLoggedIn );
 	const [ loadingMessageIndex, setLoadingMessageIndex ] = useState( 0 );
 	const [ browserBootstrapReady, setBrowserBootstrapReady ] =
 		useState( isLoggedIn );
@@ -2226,6 +2228,7 @@ export default function AgentChat( {
 			waitingForSessions: isLoggedIn ? currentSessionsRef.current : null,
 			bootstrapped: ! isLoggedIn,
 		};
+		setIsSessionBootstrapping( isLoggedIn && !! activeAgentSlug );
 		newChatSession();
 		setUnreadCount( 0 );
 	}, [ activeAgentSlug, isLoggedIn, newChatSession ] );
@@ -2243,6 +2246,7 @@ export default function AgentChat( {
 
 		if ( chat.sessionId ) {
 			bootstrap.bootstrapped = true;
+			setIsSessionBootstrapping( false );
 			return;
 		}
 
@@ -2254,6 +2258,8 @@ export default function AgentChat( {
 		bootstrap.bootstrapped = true;
 		if ( latestSession?.id ) {
 			chat.loadSession( latestSession.id );
+		} else {
+			setIsSessionBootstrapping( false );
 		}
 		// Depend on the granular chat.* fields this effect reads, not the whole
 		// `chat` object: re-running on every chat mutation would re-trigger
@@ -2267,6 +2273,11 @@ export default function AgentChat( {
 		chatStorageReady,
 		isLoggedIn,
 	] );
+	useEffect( () => {
+		if ( isSessionBootstrapping && chat.error ) {
+			setIsSessionBootstrapping( false );
+		}
+	}, [ chat.error, isSessionBootstrapping ] );
 	useEffect( () => {
 		if (
 			! activeAgentSlug ||
@@ -2597,40 +2608,57 @@ export default function AgentChat( {
 							)
 					),
 				renderChatHeader(),
-				activeAgentSlug &&
-					createElement(
-						AgentUI.Container,
-						{
-							key: activeAgentSlug,
-							messages: displayMessages,
-							isProcessing: chat.isProcessing,
-							error: chat.error,
-							onSubmit: submitMessage,
-							onStop: chat.cancelRun,
-							placeholder: sprintf(
-								/* translators: %s: agent name. */
-								__( 'Ask %s anything…', 'frontend-agent-chat' ),
-								activeAgentName
-							),
-							emptyView,
-							suggestions: messageSuggestions,
-							clearSuggestions: () => undefined,
-							thinkingMessage,
-							allowAttachments: canUploadFiles,
-							acceptedFileTypes,
-						},
-						createElement(
-							AgentUI.ConversationView,
-							null,
-							createElement( AgentUI.Messages ),
-							createElement(
-								AgentUI.Footer,
-								null,
-								createElement( AgentUI.Notice ),
-								createElement( AgentUI.Input )
+				activeAgentSlug && isSessionBootstrapping
+					? createElement(
+							'div',
+							{
+								className:
+									'frontend-agent-chat__session-loading',
+								role: 'status',
+								'aria-live': 'polite',
+							},
+							__(
+								'Loading previous conversation…',
+								'frontend-agent-chat'
 							)
-						)
-					)
+					  )
+					: activeAgentSlug &&
+							createElement(
+								AgentUI.Container,
+								{
+									key: activeAgentSlug,
+									messages: displayMessages,
+									isProcessing: chat.isProcessing,
+									error: chat.error,
+									onSubmit: submitMessage,
+									onStop: chat.cancelRun,
+									placeholder: sprintf(
+										/* translators: %s: agent name. */
+										__(
+											'Ask %s anything…',
+											'frontend-agent-chat'
+										),
+										activeAgentName
+									),
+									emptyView,
+									suggestions: messageSuggestions,
+									clearSuggestions: () => undefined,
+									thinkingMessage,
+									allowAttachments: canUploadFiles,
+									acceptedFileTypes,
+								},
+								createElement(
+									AgentUI.ConversationView,
+									null,
+									createElement( AgentUI.Messages ),
+									createElement(
+										AgentUI.Footer,
+										null,
+										createElement( AgentUI.Notice ),
+										createElement( AgentUI.Input )
+									)
+								)
+							)
 			)
 		)
 	);

@@ -435,6 +435,16 @@
 	overflow: hidden;
 }
 
+.frontend-agent-chat__session-loading {
+	display: grid;
+	flex: 1;
+	place-items: center;
+	padding: 1.5rem;
+	color: var(--frontend-agent-chat-text-muted, #64748b);
+	font-size: 0.875rem;
+	text-align: center;
+}
+
 /*
  * Bridge: FAC tokens -> agenttic-ui tokens.
  *
