@@ -1,0 +1,15 @@
+{
+  "schema": "wp-codebox/fuzz-suite/v1",
+  "id": "fac-session-hydration",
+  "version": "1",
+  "metadata": { "runtime_requirements": { "extra_plugins": [
+    { "slug": "frontend-agent-chat", "source": "__REPO_ROOT__", "path": "__REPO_ROOT__", "loadAs": "plugin", "activate": true },
+    { "slug": "session-hydration-fixture", "source": "__REPO_ROOT__/tests/fixtures/session-hydration-fixture", "path": "__REPO_ROOT__/tests/fixtures/session-hydration-fixture", "loadAs": "plugin", "activate": true }
+  ] } },
+  "target": { "kind": "runtime", "id": "wordpress.browser-actions", "entrypoint": "wordpress.browser-actions" },
+  "cases": [ {
+    "id": "restore-is-explicit",
+    "description": "Delayed latest-session restore shows loading before the historical message and never sends chat input.",
+    "input": { "args": [ "url=/", "auth=wordpress-admin", "auth-user-id=1", "step-timeout=10s", "timeout=15s", "capture=steps,network,screenshot", "steps-json=[{\"kind\":\"click\",\"selector\":\".frontend-agent-chat__fab\"},{\"kind\":\"evaluate\",\"expression\":\"({loading:!!document.querySelector('.frontend-agent-chat__session-loading'),composer:!!document.querySelector('textarea')})\",\"assert\":{\"loading\":true,\"composer\":false}},{\"kind\":\"expect\",\"selector\":\"[data-role=user]\",\"state\":\"visible\",\"timeout\":\"10s\"},{\"kind\":\"evaluate\",\"expression\":\"({history:document.body.textContent.includes('Historical fixture message'),loading:!!document.querySelector('.frontend-agent-chat__session-loading')})\",\"assert\":{\"history\":true,\"loading\":false}}]" ] }
+  } ]
+}
