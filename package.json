@@ -7,6 +7,7 @@
 		"build": "wp-scripts build",
 		"test": "npm run typecheck && npm run test:unit && npm run test:diagnostics",
 		"test:diagnostics": "node --no-warnings --experimental-strip-types tests/operator-diagnostics-smoke.ts",
+		"test:fuzz:session-hydration": "node tests/fuzz/run-session-hydration.mjs",
 		"test:unit": "wp-scripts test-unit-js --runInBand",
 		"typecheck": "tsc --noEmit"
 	},
